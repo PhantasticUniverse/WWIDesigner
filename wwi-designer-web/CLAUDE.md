@@ -61,9 +61,10 @@ Tests are critical for verifying Java parity. Each acoustic calculation should h
 - [x] Phase 1: Data models
 - [x] Phase 2: Math (Complex, TransferMatrix, StateVector)
 - [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
-- [ ] Phase 4: Instrument Calculators (holes, mouthpieces, tuner)
-- [ ] Phase 5: Optimization (DIRECT algorithm)
-- [ ] Phase 6: Web UI
+- [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
+- [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
+- [x] Phase 6: Optimization (DIRECT algorithm, evaluators, objective functions)
+- [ ] Phase 7: Web UI
 
 ---
 

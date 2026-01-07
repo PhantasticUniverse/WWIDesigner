@@ -19,3 +19,6 @@ export * from "./geometry/index.ts";
 
 // Modelling (instrument calculators)
 export * from "./modelling/index.ts";
+
+// Optimization (DIRECT optimizer, objective functions)
+export * from "./optimization/index.ts";

@@ -82,6 +82,16 @@ export interface IInstrumentCalculator {
    * Calculate the loop gain at a specified frequency.
    */
   calcGain(freq: number, Z: Complex): number;
+
+  /**
+   * Get the instrument being calculated.
+   */
+  getInstrument(): Instrument;
+
+  /**
+   * Get the physical parameters used for calculations.
+   */
+  getParams(): PhysicalParameters;
 }
 
 /**
@@ -404,6 +414,13 @@ export class DefaultInstrumentCalculator implements IInstrumentCalculator {
    * Get the physical parameters.
    */
   getPhysicalParameters(): PhysicalParameters {
+    return this.params;
+  }
+
+  /**
+   * Get the physical parameters (alias for interface compatibility).
+   */
+  getParams(): PhysicalParameters {
     return this.params;
   }
 }
