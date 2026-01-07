@@ -568,9 +568,8 @@ function createTuningEditor(tuning: Tuning, id: string): string {
 
       <!-- General Info -->
       <div class="editor-section">
-        <h3>General</h3>
         <div class="form-row">
-          <div class="form-group">
+          <div class="form-group" style="flex:2">
             <label>Name</label>
             <input type="text" id="tuning-name-${tabId}" value="${tuning.name || ""}" />
           </div>
@@ -579,17 +578,23 @@ function createTuningEditor(tuning: Tuning, id: string): string {
             <input type="number" id="tuning-holes-${tabId}" value="${numHoles}" min="1" max="20" />
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label>Description</label>
+            <textarea id="tuning-comment-${tabId}" rows="2" style="width:100%;resize:vertical">${tuning.comment || ""}</textarea>
+          </div>
+        </div>
       </div>
 
       <!-- Fingerings -->
       <div class="editor-section">
-        <h3>Fingerings</h3>
+        <h3>Fingering List</h3>
         <div class="fingering-table-container">
           <table class="data-table fingering-table" id="fingering-table-${tabId}">
             <thead>
               <tr>
-                <th>Note</th>
-                <th>Frequency (Hz)</th>
+                <th>Symbol</th>
+                <th>Frequency</th>
                 <th>Fingering</th>
                 <th>Weight</th>
                 <th></th>
@@ -600,14 +605,14 @@ function createTuningEditor(tuning: Tuning, id: string): string {
                 .map(
                   (f, i) => `
                 <tr data-index="${i}">
-                  <td><input type="text" value="${f.note?.name || ""}" data-field="noteName" /></td>
-                  <td><input type="number" step="0.1" value="${f.note?.frequency || ""}" data-field="frequency" /></td>
+                  <td><input type="text" value="${f.note?.name || ""}" data-field="noteName" style="width:80px" /></td>
+                  <td><input type="number" step="0.0001" value="${f.note?.frequency || ""}" data-field="frequency" style="width:90px" /></td>
                   <td>
                     <div class="fingering-pattern" data-fingering="${i}">
                       ${renderFingeringPattern(f.openHole, numHoles, i)}
                     </div>
                   </td>
-                  <td><input type="number" step="0.1" value="${f.optimizationWeight ?? 1}" data-field="weight" style="width:60px" /></td>
+                  <td><input type="number" step="0.1" value="${f.optimizationWeight ?? 1}" data-field="weight" style="width:50px" /></td>
                   <td><button class="btn-icon" data-remove-fingering="${i}">&times;</button></td>
                 </tr>
               `
@@ -615,7 +620,7 @@ function createTuningEditor(tuning: Tuning, id: string): string {
                 .join("")}
             </tbody>
           </table>
-          <button class="btn-small add-row-btn" data-add-fingering>+ Add Note</button>
+          <button class="btn-small add-row-btn" data-add-fingering>+ Add Fingering</button>
         </div>
       </div>
     </div>
@@ -708,6 +713,9 @@ function updateTuningFromEditor(tabId: string, tuningId: string) {
 
   const holesInput = $<HTMLInputElement>(`#tuning-holes-${tabId}`);
   if (holesInput) tuning.numberOfHoles = parseInt(holesInput.value);
+
+  const commentInput = $<HTMLTextAreaElement>(`#tuning-comment-${tabId}`);
+  if (commentInput) tuning.comment = commentInput.value;
 
   const fingeringTable = $(`#fingering-table-${tabId}`);
   if (fingeringTable) {
