@@ -61,15 +61,18 @@ export function copyNote(note: Note | null | undefined): Note {
   };
 }
 
+// Re-export cents from constants to avoid import confusion
+// The canonical version is in core/constants.ts
+import { cents as centsCalc } from "../core/constants.ts";
+
 /**
- * Calculate the difference in cents between two frequencies
+ * Calculate the difference in cents between two frequencies.
+ * This re-exports the function from core/constants.ts for convenience.
  * @param f1 First frequency (reference)
  * @param f2 Second frequency
  * @returns Difference in cents (positive if f2 > f1)
  */
-export function cents(f1: number, f2: number): number {
-  return (Math.log(f2 / f1) / MathConstants.LOG2) * MusicalConstants.CENTS_IN_OCTAVE;
-}
+export const centsFromFrequencies = centsCalc;
 
 /**
  * Get the effective target frequency for a note
@@ -458,7 +461,8 @@ export function createChromaticTuning(
     const frequency = baseFrequency * Math.pow(semitoneRatio, semitones);
     const noteIndex = (baseNoteIndex + i) % 12;
     const octave = baseOctave + Math.floor((baseNoteIndex + i) / 12);
-    const noteName = noteNames[noteIndex] + octave;
+    // noteIndex is always 0-11 due to modulo, so this access is safe
+    const noteName = (noteNames[noteIndex] ?? "?") + octave;
 
     const fingering = createFingering(numberOfHoles);
     fingering.note = createNote(noteName, frequency);

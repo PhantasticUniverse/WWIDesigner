@@ -18,6 +18,9 @@ import {
   getMultiplierFromMetres,
 } from "../core/constants.ts";
 
+// Re-export LengthType for consumers
+export type { LengthType };
+
 // ============================================================================
 // Key - represents a mechanical key mechanism on a hole
 // ============================================================================
@@ -341,15 +344,18 @@ export function isPressureNode(mouthpiece: Mouthpiece): boolean {
 export function calculateGainFactor(mouthpiece: Mouthpiece): number | null {
   const nominalBeta = mouthpiece.beta ?? 0.35;
 
-  if (mouthpiece.fipple && mouthpiece.fipple.windwayHeight) {
+  if (mouthpiece.fipple) {
     const f = mouthpiece.fipple;
-    return (
-      (8.0 *
-        f.windwayHeight *
-        Math.sqrt((2.0 * f.windwayHeight) / f.windowLength) *
-        Math.exp((nominalBeta * f.windowLength) / f.windwayHeight)) /
-      (f.windowLength * f.windowWidth)
-    );
+    const wh = f.windwayHeight;
+    if (wh !== undefined && wh > 0) {
+      return (
+        (8.0 *
+          wh *
+          Math.sqrt((2.0 * wh) / f.windowLength) *
+          Math.exp((nominalBeta * f.windowLength) / wh)) /
+        (f.windowLength * f.windowWidth)
+      );
+    }
   }
 
   if (mouthpiece.embouchureHole) {
