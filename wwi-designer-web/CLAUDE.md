@@ -168,7 +168,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
 | Evaluators | 8 | 7 | 88% |
-| Objective Functions | 55 | 2 | 4% |
+| Objective Functions | 55 | 3 | 5% |
 | Tuners | 5 | 5 | 100% |
 | Spectrum Analyzers | 3 | 3 | 100% |
 | Study Models | 4 | 0 | 0% |
