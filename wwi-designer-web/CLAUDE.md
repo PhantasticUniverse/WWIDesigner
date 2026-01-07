@@ -1,3 +1,73 @@
+# WWIDesigner Web - Developer Notes
+
+## Project Overview
+
+This is a TypeScript/Bun port of WWIDesigner, a Java application for designing and optimizing woodwind instruments using acoustic modeling and multi-variable optimization.
+
+**Critical Requirement:** All acoustic calculations must achieve perfect parity with the Java version. Results must match within 0.001% tolerance.
+
+## Architecture
+
+```
+src/
+├── core/
+│   ├── constants.ts       # Physical & musical constants
+│   ├── math/              # Complex numbers, transfer matrices, state vectors
+│   ├── physics/           # Air properties (PhysicalParameters)
+│   └── geometry/          # Bore section calculators, tube formulas
+├── models/                # Data models (Instrument, Tuning, Constraints)
+└── utils/                 # XML converter for legacy files
+```
+
+## Key Acoustic Concepts
+
+### Transfer Matrix Method
+The core acoustic model uses 2x2 complex transfer matrices to represent acoustic transmission through bore sections, holes, and mouthpieces. For a component:
+```
+[P_out]   [PP  PU] [P_in]
+[U_out] = [UP  UU] [U_in]
+```
+Where P is pressure and U is volume flow.
+
+### Critical Formulas (must match Java exactly)
+
+1. **Cylinder Transfer Matrix:**
+   - Uses complex wave number with loss term: `k_complex = k * (1 + ε - jε)`
+   - `ε = α / (r * √k)` where α is the alpha constant from PhysicalParameters
+
+2. **Cone Transfer Matrix:**
+   - From Lefebvre & Kergomard formulas
+   - Uses mean complex wave vector along cone length
+
+3. **Radiation Impedance:**
+   - Unflanged: Silva et al., 2008 formulas
+   - Flanged: Kergomard et al., 2015 formulas
+
+### PhysicalParameters
+Calculates temperature/pressure/humidity-dependent air properties using CIPM-2007 formulas:
+- Speed of sound, density, viscosity
+- Gamma (specific heat ratio)
+- Alpha constant for loss calculations
+
+## Testing
+
+Run tests: `bun test`
+Run with watch: `bun test --watch`
+
+Tests are critical for verifying Java parity. Each acoustic calculation should have corresponding Java output to validate against.
+
+## Migration Status
+
+- [x] Phase 1: Data models
+- [x] Phase 2: Math (Complex, TransferMatrix, StateVector)
+- [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
+- [ ] Phase 4: Instrument Calculators (holes, mouthpieces, tuner)
+- [ ] Phase 5: Optimization (DIRECT algorithm)
+- [ ] Phase 6: Web UI
+
+---
+
+## Bun Configuration
 
 Default to using Bun instead of Node.js.
 

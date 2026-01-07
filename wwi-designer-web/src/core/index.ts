@@ -16,3 +16,6 @@ export * from "./physics/index.ts";
 
 // Geometry calculators (bore sections, tubes)
 export * from "./geometry/index.ts";
+
+// Modelling (instrument calculators)
+export * from "./modelling/index.ts";
