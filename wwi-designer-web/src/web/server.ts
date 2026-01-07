@@ -11,7 +11,7 @@ import {
   createCalculator,
   type CalculatorType,
 } from "../core/modelling/calculator-factory.ts";
-import { InstrumentTuner } from "../core/modelling/instrument-tuner.ts";
+import { SimpleInstrumentTuner } from "../core/modelling/instrument-tuner.ts";
 import { CentDeviationEvaluator } from "../core/optimization/evaluator.ts";
 import {
   HolePositionObjectiveFunction,
@@ -62,7 +62,7 @@ async function handleCalculateTuning(req: Request): Promise<Response> {
     const params = new PhysicalParameters(temperature, "C", humidity);
     // Use calculator factory with type detection or explicit type
     const calc = createCalculator(instrument, params, calculatorType);
-    const tuner = new InstrumentTuner(calc);
+    const tuner = new SimpleInstrumentTuner(instrument, tuning, calc, params);
 
     const results = tuning.fingering.map((fingering: Fingering) => {
       const note = fingering.note;
