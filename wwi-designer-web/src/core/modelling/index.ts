@@ -10,3 +10,20 @@ export {
   DefaultInstrumentCalculator,
   createInstrumentCalculator,
 } from "./instrument-calculator.ts";
+
+export {
+  PlayingRange,
+  NoPlayingRange,
+} from "./playing-range.ts";
+
+export {
+  type IInstrumentTuner,
+  InstrumentTuner,
+  SimpleInstrumentTuner,
+  type TuningResult,
+  type TuningStats,
+  calcCents,
+  compareTunings,
+  calcTuningStats,
+  createInstrumentTuner,
+} from "./instrument-tuner.ts";
