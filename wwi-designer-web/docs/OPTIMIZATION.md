@@ -258,13 +258,159 @@ function calcCents(target: number, predicted: number): number {
 }
 ```
 
-### Other Evaluators
+### Available Evaluators
 
 | Evaluator | Metric | Use Case |
 |-----------|--------|----------|
-| `CentDeviationEvaluator` | Cents from target | Primary tuning optimization |
+| `CentDeviationEvaluator` | Cents from target frequency | Primary tuning optimization |
 | `FrequencyDeviationEvaluator` | Hz deviation | Absolute frequency matching |
 | `ReactanceEvaluator` | Im(Z) at target freq | Resonance matching |
+| `FminEvaluator` | Cents from target fmin | Playing range minimum |
+| `FmaxEvaluator` | Cents from target fmax | Playing range maximum |
+| `FminmaxEvaluator` | Weighted fmin+fmax deviation | Full playing range optimization |
+
+### Playing Range Evaluators
+
+The `FminEvaluator`, `FmaxEvaluator`, and `FminmaxEvaluator` evaluate deviations from the minimum and maximum frequencies of a playing range.
+
+```typescript
+// FminEvaluator - evaluates deviation from target frequencyMin
+class FminEvaluator extends BaseEvaluator {
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    return fingeringTargets.map(target => {
+      if (target.note?.frequencyMin === undefined) return 0; // Exclude
+      const predicted = this.tuner.predictedNote(target);
+      return calcCents(target.note.frequencyMin, predicted.frequencyMin ?? 0);
+    });
+  }
+}
+
+// FmaxEvaluator - evaluates deviation from target frequencyMax
+class FmaxEvaluator extends BaseEvaluator {
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    return fingeringTargets.map(target => {
+      if (target.note?.frequencyMax === undefined) return 0; // Exclude
+      const predicted = this.tuner.predictedNote(target);
+      return calcCents(target.note.frequencyMax, predicted.frequencyMax ?? 0);
+    });
+  }
+}
+
+// FminmaxEvaluator - weighted combination
+// FMAX_WEIGHT = 4.0, FMIN_WEIGHT = 1.0, FPLAYING_WEIGHT = 1.0
+class FminmaxEvaluator extends BaseEvaluator {
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    return fingeringTargets.map(target => {
+      const predicted = this.tuner.predictedNote(target);
+
+      // Priority: fmax → fmin → nominal frequency
+      if (target.note?.frequencyMax && predicted.frequencyMax) {
+        const fmaxDev = 4.0 * calcCents(target.note.frequencyMax, predicted.frequencyMax);
+        if (target.note.frequencyMin && predicted.frequencyMin) {
+          const fminDev = 1.0 * calcCents(target.note.frequencyMin, predicted.frequencyMin);
+          return Math.sqrt(fmaxDev² + fminDev²); // Combined
+        }
+        return fmaxDev;
+      }
+      // Fall back to nominal frequency
+      return calcCents(target.note?.frequency ?? 0, predicted.frequency ?? 0);
+    });
+  }
+}
+```
+
+### Evaluator Factory
+
+```typescript
+import { createEvaluator, EvaluatorType } from "./optimization/evaluator.ts";
+
+// Available types: "cents" | "frequency" | "reactance" | "fmin" | "fmax" | "fminmax"
+const evaluator = createEvaluator("fminmax", calculator, tuner);
+```
+
+## Instrument Tuners
+
+Tuners predict the playing frequency for a given fingering. Different tuners use different models for how a player would typically play each note.
+
+### SimpleInstrumentTuner
+
+The basic tuner finds the frequency where Im(Z) = 0:
+
+```typescript
+class SimpleInstrumentTuner extends InstrumentTuner {
+  predictedFrequency(fingering: Fingering): number | null {
+    const range = new PlayingRange(this.calculator, fingering);
+    return range.findXZero(targetFreq); // Where Im(Z) = 0
+  }
+}
+```
+
+### LinearVInstrumentTuner
+
+A more sophisticated tuner that models a linear change in blowing velocity from fmax (lowest note) to fmin (highest note). This better matches how real players adjust their breath pressure across the instrument's range.
+
+**Reference:** Fletcher and Rossing, *The physics of musical instruments*, 2nd ed., section 16.10
+
+```typescript
+import { LinearVInstrumentTuner, createLinearVTuner } from "./instrument-tuner.ts";
+
+// Create with blowing level (0-10, default 5)
+const tuner = createLinearVTuner(instrument, tuning, params, 5);
+
+// Or manually:
+const tuner = new LinearVInstrumentTuner(
+  instrument,
+  tuning,
+  calculator,
+  params,
+  blowingLevel // 0 = soft, 10 = hard
+);
+```
+
+**Key features:**
+- Uses Strouhal number-based velocity estimation
+- Linear interpolation of blowing velocity between lowest and highest notes
+- Predicts fmin, fmax, AND nominal frequency for each note
+- Blowing level lookup tables from Java implementation
+
+**Velocity calculation:**
+
+```typescript
+// Strouhal number based on impedance ratio
+const strouhal = 0.26 - 0.037 * (z.im / z.re);
+
+// Velocity = f * windowLength / strouhal
+const velocity = f * windowLength / strouhal;
+
+// Reverse: predict Z ratio from velocity
+const zRatio = (0.26 - f * windowLength / velocity) / 0.037;
+```
+
+**Predicted note:**
+
+```typescript
+predictedNote(fingering: Fingering): Note {
+  const range = new PlayingRange(this.calculator, fingering);
+
+  // fmax = where Im(Z) = 0
+  const fmax = range.findXZero(target);
+
+  // fmin = minimum playable frequency (gain drops or local minimum of Im/Re)
+  const fmin = range.findFmin(fmax);
+
+  // fnom = where Im(Z)/Re(Z) = predicted ratio for this velocity
+  const fnom = range.findZRatio(target, zRatioTarget);
+
+  return { frequencyMin: fmin, frequencyMax: fmax, frequency: fnom };
+}
+```
+
+### Available Tuners
+
+| Tuner | Model | When to Use |
+|-------|-------|-------------|
+| `SimpleInstrumentTuner` | Im(Z) = 0 | Basic tuning, fast computation |
+| `LinearVInstrumentTuner` | Linear velocity model | Playing range analysis, fmin/fmax prediction |
 
 ## Optimization Workflow
 

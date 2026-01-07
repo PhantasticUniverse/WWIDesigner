@@ -156,16 +156,18 @@ src/
 │   │   ├── instrument-calculator.ts  # Core calculator
 │   │   ├── calculator-factory.ts     # NAF/Whistle/Flute factories
 │   │   ├── playing-range.ts          # Resonance finding
-│   │   └── instrument-tuner.ts       # Tuning prediction
+│   │   ├── instrument-tuner.ts       # Tuning prediction (Simple, LinearV)
+│   │   └── spectrum.ts               # Impedance/Reflectance spectrum
 │   └── optimization/
 │       ├── direct.ts                 # DIRECT algorithm
-│       ├── evaluator.ts              # Cent deviation evaluator
+│       ├── evaluator.ts              # Cent, Fmin, Fmax, Fminmax evaluators
 │       └── hole-position-objective.ts # Optimization objectives
 ├── models/
 │   ├── instrument.ts             # Instrument geometry model
 │   └── tuning.ts                 # Tuning/fingering model
 └── web/
-    └── server.ts                 # Bun.serve API endpoints
+    ├── server.ts                 # Bun.serve API endpoints
+    └── frontend.ts               # UI with instrument visualization
 ```
 
 ## Java Parity
