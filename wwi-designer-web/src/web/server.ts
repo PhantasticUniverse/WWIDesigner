@@ -59,7 +59,9 @@ async function handleCalculateTuning(req: Request): Promise<Response> {
       return Response.json({ error: "Tuning has no fingerings" }, { status: 400 });
     }
 
-    const params = new PhysicalParameters(temperature, "C", humidity);
+    // PhysicalParameters(temp, tempType, pressure, humidity, xCO2)
+    // Use standard pressure (101.325 kPa) and standard CO2 (0.00039)
+    const params = new PhysicalParameters(temperature, "C", 101.325, humidity, 0.00039);
     // Use calculator factory with type detection or explicit type
     const calc = createCalculator(instrument, params, calculatorType);
     const tuner = new SimpleInstrumentTuner(instrument, tuning, calc, params);
@@ -117,7 +119,8 @@ async function handleOptimize(req: Request): Promise<Response> {
       return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
     }
 
-    const params = new PhysicalParameters(temperature, "C", humidity);
+    // PhysicalParameters(temp, tempType, pressure, humidity, xCO2)
+    const params = new PhysicalParameters(temperature, "C", 101.325, humidity, 0.00039);
     // Use calculator factory with type detection or explicit type
     const calc = createCalculator(instrument, params, calculatorType);
     const evaluator = new CentDeviationEvaluator(calc);
