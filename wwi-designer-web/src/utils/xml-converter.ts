@@ -33,10 +33,13 @@ interface XmlNode {
  * Not a full XML parser - just enough for our specific format.
  */
 function parseXml(xml: string): XmlNode | null {
-  // Remove XML declaration and namespace prefixes
+  // Remove XML declaration and namespace-related attributes
   xml = xml.replace(/<\?xml[^>]*\?>/g, "");
   xml = xml.replace(/xmlns:[^=]+="[^"]*"/g, "");
-  xml = xml.replace(/<\/?ns\d+:/g, (match) => match.replace(/ns\d+:/, ""));
+  xml = xml.replace(/xmlns="[^"]*"/g, "");
+  xml = xml.replace(/xsi:schemaLocation="[^"]*"/g, "");
+  // Remove any namespace prefixes (e.g., ns2:, wii:, etc.)
+  xml = xml.replace(/<\/?[\w]+:/g, (match) => match.replace(/[\w]+:/, ""));
 
   const stack: XmlNode[] = [];
   let current: XmlNode | null = null;
