@@ -1026,6 +1026,16 @@ export class HoleGroupPositionObjectiveFunction extends BaseObjectiveFunction {
   getHoleGroups(): number[][] {
     return this.holeGroups.map((g) => [...g]);
   }
+
+  /**
+   * Set whether to allow bore diameter interpolation when changing hole positions.
+   * This is a stub for compatibility with Java API - interpolation is not yet implemented.
+   * @returns this for method chaining
+   */
+  setAllowBoreSizeInterpolation(_allow: boolean): this {
+    // Stub: interpolation not yet implemented
+    return this;
+  }
 }
 
 /**
@@ -3465,5 +3475,538 @@ export class SingleTaperSimpleRatioObjectiveFunction extends BaseObjectiveFuncti
     this.upperBounds = [1.3, 0.5, 1.0];
     this.constraints.setLowerBounds(this.lowerBounds);
     this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+// ============================================================================
+// Global Optimizer Variants
+// These use DIRECT global optimizer instead of BOBYQA/Brent for more
+// thorough exploration of the search space.
+// ============================================================================
+
+/**
+ * Global optimization variant of HolePositionObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalHolePositionObjectiveFunction.java
+ */
+export class GlobalHolePositionObjectiveFunction extends HolePositionObjectiveFunction {
+  static override readonly DISPLAY_NAME = "Hole position global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator, lengthAdjustmentMode);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 30000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalHolePositionObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}
+
+/**
+ * Global optimization variant of HoleObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalHoleObjectiveFunction.java
+ */
+export class GlobalHoleObjectiveFunction extends HoleObjectiveFunction {
+  static override readonly DISPLAY_NAME =
+    "Hole position and diameter global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator, lengthAdjustmentMode);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 40000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalHoleObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}
+
+/**
+ * Global optimization variant of HoleAndTaperObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalHoleAndTaperObjectiveFunction.java
+ */
+export class GlobalHoleAndTaperObjectiveFunction extends HoleAndTaperObjectiveFunction {
+  static override readonly DISPLAY_NAME = "Hole and taper global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 30000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalHoleAndTaperObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}
+
+/**
+ * Global optimization variant of HoleAndBoreDiameterFromBottomObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalHoleAndBoreDiameterFromBottomObjectiveFunction.java
+ */
+export class GlobalHoleAndBoreDiameterFromBottomObjectiveFunction extends HoleAndBoreDiameterFromBottomObjectiveFunction {
+  static override readonly DISPLAY_NAME =
+    "Hole, plus bore diameter from bottom, global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator, unchangedBorePoints);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 60000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalHoleAndBoreDiameterFromBottomObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}
+
+/**
+ * Global optimization variant of HoleAndBoreDiameterFromTopObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalHoleAndBoreDiameterFromTopObjectiveFunction.java
+ */
+export class GlobalHoleAndBoreDiameterFromTopObjectiveFunction extends HoleAndBoreDiameterFromTopObjectiveFunction {
+  static override readonly DISPLAY_NAME =
+    "Hole, plus bore diameter from top, global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator, changedBorePoints);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 60000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalHoleAndBoreDiameterFromTopObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}
+
+// ============================================================================
+// Single Taper Merged Objective Functions
+// Combine hole optimization with single-taper bore profile
+// ============================================================================
+
+/**
+ * Optimization objective function for bore length, hole positions without
+ * groups, hole diameters, and a simple one-section taper.
+ * The foot diameter remains invariant.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - SingleTaperRatioObjectiveFunction: taper profile
+ *
+ * Ported from SingleTaperNoHoleGroupingObjectiveFunction.java
+ */
+export class SingleTaperNoHoleGroupingObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Single taper, no-hole-grouping optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.MOVE_BOTTOM
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new SingleTaperRatioObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperNoHoleGroupingObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperNoHoleGroupingObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+}
+
+/**
+ * Optimization objective function for bore length, hole positions without
+ * groups (from top), hole diameters, and a simple one-section taper.
+ * The foot diameter remains invariant. This version constrains the top hole position.
+ *
+ * Combines:
+ * - HolePositionFromTopObjectiveFunction: bore length + hole spacings from top
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - SingleTaperSimpleRatioObjectiveFunction: taper profile
+ *
+ * Ported from SingleTaperNoHoleGroupingFromTopObjectiveFunction.java
+ */
+export class SingleTaperNoHoleGroupingFromTopObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Single taper, no hole grouping";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HolePositionFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.MOVE_BOTTOM
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new SingleTaperSimpleRatioObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperNoHoleGroupingFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperNoHoleGroupingFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+/**
+ * Optimization objective function for bore length, hole positions in groups,
+ * hole diameters, and a simple one-section taper.
+ * The foot diameter remains invariant.
+ *
+ * Combines:
+ * - HoleGroupPositionObjectiveFunction: grouped hole positions
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - SingleTaperSimpleRatioObjectiveFunction: taper profile
+ *
+ * Ported from SingleTaperHoleGroupObjectiveFunction.java
+ */
+export class SingleTaperHoleGroupObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Single taper, grouped-hole optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    holeGroups: number[][],
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const holeGroupPos = new HoleGroupPositionObjectiveFunction(
+      calculator,
+      tuning,
+      evaluator,
+      holeGroups,
+      lengthAdjustmentMode
+    );
+    holeGroupPos.setAllowBoreSizeInterpolation(false);
+
+    this.components = [
+      holeGroupPos,
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new SingleTaperSimpleRatioObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperHoleGroupObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperHoleGroupObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+}
+
+/**
+ * Optimization objective function for bore length, constrained position of top
+ * hole relative to bore length, hole positions in groups, with holes equally
+ * spaced within groups, hole diameters, and a simple one-section taper.
+ * The foot diameter remains invariant.
+ *
+ * Combines:
+ * - HoleGroupPositionFromTopObjectiveFunction: grouped hole positions from top
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - SingleTaperSimpleRatioObjectiveFunction: taper profile
+ *
+ * Ported from SingleTaperHoleGroupFromTopObjectiveFunction.java
+ */
+export class SingleTaperHoleGroupFromTopObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Single taper, grouped hole";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    holeGroups: number[][],
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const holeGroupPos = new HoleGroupPositionFromTopObjectiveFunction(
+      calculator,
+      tuning,
+      evaluator,
+      holeGroups,
+      lengthAdjustmentMode
+    );
+    holeGroupPos.setAllowBoreSizeInterpolation(false);
+
+    this.components = [
+      holeGroupPos,
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new SingleTaperSimpleRatioObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperHoleGroupFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperHoleGroupFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+// ============================================================================
+// Combined Bore Objective Functions
+// ============================================================================
+
+/**
+ * Optimization objective function for hole positions and diameters,
+ * and a conical bore.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - ConicalBoreObjectiveFunction: foot diameter of conical bore
+ *
+ * Bore points below the lowest hole are kept the same distance
+ * from the bottom of the bore.
+ * All interior bore points in the bottom half of the bore are scaled
+ * proportionally to the change in the diameter at the foot.
+ *
+ * Ported from HoleAndConicalBoreObjectiveFunction.java
+ */
+export class HoleAndConicalBoreObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Hole and conical bore optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+
+    // Note: Uses PRESERVE_BELL (which we map to PRESERVE_LENGTH for now)
+    // to keep bore points below the lowest hole unchanged
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.PRESERVE_LENGTH
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new ConicalBoreObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 30000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndConicalBoreObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndConicalBoreObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+}
+
+/**
+ * Optimization objective function for headjoint length and bore diameters
+ * at existing bore points at top of bore.
+ *
+ * Combines:
+ * - StopperPositionObjectiveFunction: headjoint length
+ * - BoreDiameterFromTopObjectiveFunction: bore diameters from top
+ *
+ * Ported from HeadjointObjectiveFunction.java
+ */
+export class HeadjointObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Headjoint length and profile optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator);
+
+    // Default: use bore points with "Head" in name
+    const nrPoints =
+      changedBorePoints ??
+      HeadjointObjectiveFunction.getLowestHeadPoint(calculator.getInstrument());
+
+    this.components = [
+      new StopperPositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        false // preserveTaper = false
+      ),
+      new BoreDiameterFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrPoints
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 40000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HeadjointObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("HeadjointObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+  }
+
+  /**
+   * Find the number of bore points from the top that are part of the "Head"
+   * section (based on bore point names containing "Head").
+   */
+  static getLowestHeadPoint(instrument: Instrument): number {
+    const sortedBorePoints = getSortedBorePoints(instrument);
+    let headPointCount = 1; // At minimum, include top bore point
+
+    for (let i = 0; i < sortedBorePoints.length; i++) {
+      const bp = sortedBorePoints[i]!;
+      const name = (bp as { name?: string }).name;
+      if (name && name.toLowerCase().includes("head")) {
+        headPointCount = i + 1;
+      }
+    }
+
+    return headPointCount;
+  }
+}
+
+/**
+ * Optimization objective function for hole positions and diameters,
+ * plus headjoint length and bore diameters.
+ *
+ * Combines:
+ * - HoleObjectiveFunction: hole positions and diameters
+ * - StopperPositionObjectiveFunction: headjoint length
+ * - BoreDiameterFromTopObjectiveFunction: bore diameters from top
+ *
+ * Ported from HoleAndHeadjointObjectiveFunction.java
+ */
+export class HoleAndHeadjointObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Hole and headjoint optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrPoints =
+      changedBorePoints ??
+      HeadjointObjectiveFunction.getLowestHeadPoint(calculator.getInstrument());
+
+    this.components = [
+      new HoleObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.PRESERVE_LENGTH
+      ),
+      new StopperPositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        false // preserveTaper = false
+      ),
+      new BoreDiameterFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrPoints
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 50000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndHeadjointObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndHeadjointObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
   }
 }

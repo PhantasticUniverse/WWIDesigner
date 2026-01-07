@@ -74,6 +74,21 @@ export {
   StopperPositionObjectiveFunction,
   ConicalBoreObjectiveFunction,
   BoreLengthAdjustmentType,
+  // Global optimizer variants
+  GlobalHolePositionObjectiveFunction,
+  GlobalHoleObjectiveFunction,
+  GlobalHoleAndTaperObjectiveFunction,
+  GlobalHoleAndBoreDiameterFromBottomObjectiveFunction,
+  GlobalHoleAndBoreDiameterFromTopObjectiveFunction,
+  // Single taper merged objectives
+  SingleTaperNoHoleGroupingObjectiveFunction,
+  SingleTaperNoHoleGroupingFromTopObjectiveFunction,
+  SingleTaperHoleGroupObjectiveFunction,
+  SingleTaperHoleGroupFromTopObjectiveFunction,
+  // Combined bore objectives
+  HoleAndConicalBoreObjectiveFunction,
+  HeadjointObjectiveFunction,
+  HoleAndHeadjointObjectiveFunction,
 } from "./hole-position-objective.ts";
 
 // Optimization orchestrator
