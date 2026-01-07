@@ -57,6 +57,15 @@ import {
   HoleAndBorePositionObjectiveFunction,
   HoleAndBoreSpacingFromTopObjectiveFunction,
   GlobalBoreFromBottomObjectiveFunction,
+  GlobalHoleAndBoreFromBottomObjectiveFunction,
+  // Hemispherical bore head
+  HemisphericalBoreHead,
+  SingleTaperSimpleRatioHemiHeadObjectiveFunction,
+  SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction,
+  SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction,
+  // Calibration objectives
+  FluteCalibrationObjectiveFunction,
+  WhistleCalibrationObjectiveFunction,
 } from "../../../src/core/optimization/hole-position-objective.ts";
 import { OptimizerType } from "../../../src/core/optimization/base-objective-function.ts";
 import { CentDeviationEvaluator } from "../../../src/core/optimization/evaluator.ts";
@@ -4106,6 +4115,505 @@ describe("Objective Functions", () => {
         tuning,
         evaluator,
         2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("GlobalHoleAndBoreFromBottomObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("uses DIRECT optimizer", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new GlobalHoleAndBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      expect(objective.getOptimizerType()).toBe(OptimizerType.DIRECT);
+      expect(objective.getMaxEvaluations()).toBe(60000);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new GlobalHoleAndBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
+      }
+    });
+  });
+
+  // ============================================================================
+  // Hemispherical Bore Head Tests
+  // ============================================================================
+
+  describe("HemisphericalBoreHead", () => {
+    test("addHemiHead creates correct number of bore points", () => {
+      const borePoints: Array<{ borePosition: number; boreDiameter: number }> = [];
+      HemisphericalBoreHead.addHemiHead(0, 0.016, borePoints);
+
+      // Should create 11 points (1 top + 10 hemi points)
+      expect(borePoints.length).toBe(11);
+    });
+
+    test("addHemiHead creates points with increasing diameter", () => {
+      const borePoints: Array<{ borePosition: number; boreDiameter: number }> = [];
+      HemisphericalBoreHead.addHemiHead(0, 0.016, borePoints);
+
+      // Diameters should increase from near-zero to headDiameter
+      for (let i = 1; i < borePoints.length; i++) {
+        expect(borePoints[i]!.boreDiameter).toBeGreaterThan(
+          borePoints[i - 1]!.boreDiameter
+        );
+      }
+
+      // Last point should have diameter equal to headDiameter
+      expect(borePoints[borePoints.length - 1]!.boreDiameter).toBeCloseTo(0.016, 6);
+    });
+
+    test("addHemiHead creates hemispherical profile", () => {
+      const borePoints: Array<{ borePosition: number; boreDiameter: number }> = [];
+      const headDiameter = 0.02;
+      HemisphericalBoreHead.addHemiHead(0, headDiameter, borePoints);
+
+      // The equator (last point) should be at position headDiameter/2
+      expect(borePoints[borePoints.length - 1]!.borePosition).toBeCloseTo(
+        headDiameter / 2,
+        6
+      );
+    });
+
+    test("getHemiTopPoint finds equator from existing bore", () => {
+      const sortedPoints = [
+        { borePosition: 0, boreDiameter: 0.00001 },
+        { borePosition: 0.008, boreDiameter: 0.016 },
+        { borePosition: 0.3, boreDiameter: 0.016 },
+      ];
+
+      const hemiTop = HemisphericalBoreHead.getHemiTopPoint(sortedPoints);
+
+      // Should find the hemisphere equator
+      expect(hemiTop.boreDiameter).toBeCloseTo(0.016, 6);
+    });
+  });
+
+  describe("SingleTaperSimpleRatioHemiHeadObjectiveFunction", () => {
+    test("creates with correct dimensions", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      // 3 dimensions: taper ratio, taper start fraction, taper length fraction
+      expect(objective.getNrDimensions()).toBe(3);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("geometry round-trips", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 2);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction", () => {
+    test("creates merged objective", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      // HolePositionFromTop + HoleSize + SingleTaperHemiHead
+      expect(objective.getNrDimensions()).toBeGreaterThan(3);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("has correct trust region settings", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      expect(objective.getInitialTrustRegionRadius()).toBe(10.0);
+      expect(objective.getStoppingTrustRegionRadius()).toBe(1e-8);
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction", () => {
+    test("creates merged objective with hole groups", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const holeGroups = [[0, 1, 2]]; // All holes in one group
+      const objective = new SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        holeGroups
+      );
+
+      expect(objective.getNrDimensions()).toBeGreaterThan(3);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("has correct trust region settings", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const holeGroups = [[0, 1, 2]];
+      const objective = new SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        holeGroups
+      );
+
+      expect(objective.getInitialTrustRegionRadius()).toBe(10.0);
+      expect(objective.getStoppingTrustRegionRadius()).toBe(1e-8);
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const holeGroups = [[0, 1, 2]];
+      const objective = new SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        holeGroups
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  // ============================================================================
+  // Calibration Objective Function Tests
+  // ============================================================================
+
+  describe("FluteCalibrationObjectiveFunction", () => {
+    const createFluteWithEmbouchure = (): Instrument => ({
+      name: "Test Flute",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        embouchureHole: {
+          length: 10,
+          width: 10,
+          height: 3,
+          airstreamLength: 12, // 12mm
+          airstreamHeight: 2,  // 2mm
+        },
+        beta: 0.3,
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 19 },
+        { borePosition: 400, boreDiameter: 19 },
+      ],
+      hole: [
+        { position: 250, diameter: 10, height: 5 },
+        { position: 280, diameter: 10, height: 5 },
+        { position: 310, diameter: 10, height: 5 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates with correct dimensions", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new FluteCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      // 2 dimensions: airstream length, beta
+      expect(objective.getNrDimensions()).toBe(2);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("geometry extracts calibration parameters", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new FluteCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+
+      // First dimension is airstream length (0.012m)
+      expect(geometry[0]).toBeCloseTo(0.012, 6);
+      // Second dimension is beta (0.3)
+      expect(geometry[1]).toBeCloseTo(0.3, 6);
+    });
+
+    test("geometry round-trips", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new FluteCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 6);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new FluteCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("WhistleCalibrationObjectiveFunction", () => {
+    const createWhistleWithBeta = (): Instrument => ({
+      name: "Test Whistle",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+        beta: 0.4,
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16 },
+        { borePosition: 300, boreDiameter: 16 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates with correct dimensions", () => {
+      const whistle = createWhistleWithBeta();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new WhistleCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      // 2 dimensions: window height, beta
+      expect(objective.getNrDimensions()).toBe(2);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("geometry extracts calibration parameters", () => {
+      const whistle = createWhistleWithBeta();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new WhistleCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+
+      // First dimension is window height (3mm = 0.003m)
+      expect(geometry[0]).toBeCloseTo(0.003, 6);
+      // Second dimension is beta (0.4)
+      expect(geometry[1]).toBeCloseTo(0.4, 6);
+    });
+
+    test("geometry round-trips", () => {
+      const whistle = createWhistleWithBeta();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new WhistleCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 6);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createWhistleWithBeta();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new WhistleCalibrationObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
       );
 
       const value = objective.value(objective.getGeometryPoint());

@@ -4704,3 +4704,625 @@ export class GlobalBoreFromBottomObjectiveFunction extends BoreFromBottomObjecti
     );
   }
 }
+
+/**
+ * Global optimization variant of HoleAndBoreFromBottomObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalHoleAndBoreFromBottomObjectiveFunction.java
+ */
+export class GlobalHoleAndBoreFromBottomObjectiveFunction extends HoleAndBoreFromBottomObjectiveFunction {
+  static override readonly DISPLAY_NAME =
+    "Hole and bore point global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator, unchangedBorePoints);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 60000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalHoleAndBoreFromBottomObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}
+
+// ============================================================================
+// Hemispherical Bore Head Utilities and Objective Functions
+// ============================================================================
+
+/**
+ * Hemispherical bore head utility functions.
+ * Creates bore profiles with a hemispherical top section.
+ * Used primarily for Native American flute designs.
+ *
+ * Ported from HemisphericalBoreHead.java
+ */
+export class HemisphericalBoreHead {
+  private static readonly NUM_HEMI_POINTS = 10;
+
+  /**
+   * Adds a set of BorePoints that define the hemispherical head of the bore.
+   *
+   * @param origin The position of the top of the bore
+   * @param headDiameter The diameter at the equator of the hemisphere
+   * @param borePoints An array to hold the new BorePoints (modified in place)
+   */
+  static addHemiHead(
+    origin: number,
+    headDiameter: number,
+    borePoints: Array<{ borePosition: number; boreDiameter: number }>
+  ): void {
+    // Make top point with near-zero diameter
+    borePoints.push({
+      borePosition: origin,
+      boreDiameter: 0.00001, // Bore diameter must be non-zero
+    });
+
+    for (let i = 1; i <= HemisphericalBoreHead.NUM_HEMI_POINTS; i++) {
+      const heightInterval = i / HemisphericalBoreHead.NUM_HEMI_POINTS;
+      const boreDiameter = headDiameter * heightInterval;
+      const position =
+        (headDiameter -
+          Math.sqrt(headDiameter * headDiameter - boreDiameter * boreDiameter)) /
+          2 +
+        origin;
+
+      borePoints.push({
+        borePosition: position,
+        boreDiameter,
+      });
+    }
+  }
+
+  /**
+   * Determine the BorePoint representing the equator of the hemisphere.
+   * This method makes no assumptions on the regularity of the bore profile.
+   * If the initial bore point diameter is non-zero, it is used as the hemiTop diameter.
+   *
+   * @param sortedPoints Array of BorePoints sorted by position
+   * @returns A new BorePoint representing the equator
+   */
+  static getHemiTopPoint(
+    sortedPoints: Array<{ borePosition: number; boreDiameter: number }>
+  ): { borePosition: number; boreDiameter: number } {
+    const topPoint = sortedPoints[0]!;
+    const topPosition = topPoint.borePosition;
+    const topDiameter = topPoint.boreDiameter;
+    let diameter = 0;
+
+    if (topDiameter > 0.00002) {
+      diameter = topDiameter;
+    } else {
+      for (let i = 1; i < sortedPoints.length; i++) {
+        const point = sortedPoints[i]!;
+        const position = point.borePosition;
+        diameter = point.boreDiameter;
+        if (position - topPosition >= diameter / 2) {
+          break;
+        }
+      }
+    }
+
+    return {
+      borePosition: diameter / 2 + topPosition,
+      boreDiameter: diameter,
+    };
+  }
+}
+
+/**
+ * Minimum cone length constant used in taper calculations.
+ */
+const MINIMUM_CONE_LENGTH_HEMI = 0.0001;
+
+/**
+ * Objective function for a three-section bore with a single tapered section
+ * and a hemispherical head. The foot diameter remains invariant.
+ *
+ * Geometry dimensions:
+ * - Taper ratio: head diameter (at hemisphere equator) / foot diameter
+ * - Taper start as fraction of bore length (from hemisphere top)
+ * - Taper length as fraction of remaining bore
+ *
+ * Ported from SingleTaperSimpleRatioHemiHeadObjectiveFunction.java
+ */
+export class SingleTaperSimpleRatioHemiHeadObjectiveFunction extends SingleTaperSimpleRatioObjectiveFunction {
+  static override readonly DISPLAY_NAME =
+    "Single taper (simple ratios), hemi-head, optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    // Override constraints set by parent
+    this.constraints = new Constraints();
+    this.setHemiConstraints();
+  }
+
+  private setHemiConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperSimpleRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Bore diameter ratio (top/bottom)",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperSimpleRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Taper start (from hemi top), fraction of bore length",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperSimpleRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Taper length, fraction of bore below start",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperSimpleRatioHemiHeadObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperSimpleRatioHemiHeadObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  /**
+   * Finds the next BorePoint below a specified position.
+   */
+  private getNextPoint(
+    borePosition: number,
+    sortedPoints: Array<{ borePosition: number; boreDiameter: number }>
+  ): { borePosition: number; boreDiameter: number } | null {
+    for (const point of sortedPoints) {
+      if (point.borePosition > borePosition) {
+        return point;
+      }
+    }
+    return null;
+  }
+
+  override getGeometryPoint(): number[] {
+    const geometry = new Array(this.nrDimensions);
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+
+    // Get the hemisphere equator point
+    const hemiTopPoint = HemisphericalBoreHead.getHemiTopPoint(sortedPoints);
+    const nextPoint = this.getNextPoint(hemiTopPoint.borePosition, sortedPoints);
+    const penultimatePoint = sortedPoints[sortedPoints.length - 2]!;
+    const bottomPoint = sortedPoints[sortedPoints.length - 1]!;
+    const boreLength = bottomPoint.borePosition - hemiTopPoint.borePosition;
+
+    let taperStart: number;
+    let taperEnd: number;
+
+    // Taper ratio
+    geometry[0] = hemiTopPoint.boreDiameter / bottomPoint.boreDiameter;
+
+    if (
+      Math.abs(hemiTopPoint.boreDiameter - bottomPoint.boreDiameter) < 0.0001
+    ) {
+      // Bore doesn't really taper
+      taperStart = hemiTopPoint.borePosition;
+      taperEnd = bottomPoint.borePosition;
+    } else {
+      // Determine taper start
+      if (
+        nextPoint &&
+        Math.abs(hemiTopPoint.boreDiameter - nextPoint.boreDiameter) < 0.0001
+      ) {
+        taperStart = nextPoint.borePosition;
+      } else {
+        taperStart = hemiTopPoint.borePosition;
+      }
+
+      // Determine taper end
+      if (
+        Math.abs(bottomPoint.boreDiameter - penultimatePoint.boreDiameter) <
+        0.0001
+      ) {
+        taperEnd = penultimatePoint.borePosition;
+      } else {
+        taperEnd = bottomPoint.borePosition;
+      }
+    }
+
+    geometry[1] = (taperStart - hemiTopPoint.borePosition) / boreLength;
+    geometry[2] =
+      (taperEnd - taperStart) /
+      (boreLength - taperStart + hemiTopPoint.borePosition);
+
+    return geometry;
+  }
+
+  override setGeometryPoint(point: number[]): void {
+    // Replace existing bore points with hemispherical head plus taper
+    const instrument = this.calculator.getInstrument();
+    const sortedPoints = getSortedBorePoints(instrument);
+    const topPoint = sortedPoints[0]!;
+    const bottomPoint = sortedPoints[sortedPoints.length - 1]!;
+
+    const footDiameter = bottomPoint.boreDiameter;
+    const headDiameter = footDiameter * point[0]!;
+    const topPosition = topPoint.borePosition;
+
+    // Create new bore points starting with hemispherical head
+    const newBorePoints: typeof instrument.borePoint = [];
+    HemisphericalBoreHead.addHemiHead(topPosition, headDiameter, newBorePoints);
+
+    const hemiTopPosition =
+      newBorePoints[newBorePoints.length - 1]!.borePosition;
+    const boreLength = bottomPoint.borePosition - hemiTopPosition;
+    const taperStart = point[1]! * boreLength;
+    const taperLength = Math.max(
+      point[2]! * (boreLength - taperStart),
+      MINIMUM_CONE_LENGTH_HEMI
+    );
+
+    if (taperStart > 0) {
+      // Taper begins after hemi section
+      const taperStartPos = Math.min(
+        hemiTopPosition + taperStart,
+        hemiTopPosition + boreLength
+      );
+      newBorePoints.push({
+        borePosition: taperStartPos,
+        boreDiameter: headDiameter,
+      });
+    }
+
+    // Add point for end of taper
+    const taperEnd = Math.min(taperStart + taperLength, boreLength);
+    newBorePoints.push({
+      borePosition: hemiTopPosition + taperEnd,
+      boreDiameter: footDiameter,
+    });
+
+    if (taperStart + taperLength < boreLength) {
+      // Taper ends before bore end
+      newBorePoints.push({
+        borePosition: hemiTopPosition + boreLength,
+        boreDiameter: footDiameter,
+      });
+    }
+
+    instrument.borePoint = newBorePoints;
+  }
+}
+
+/**
+ * Optimization objective function for bore length, hole positions without
+ * groups, hole diameters, and a simple one-section taper with hemispherical head.
+ * The foot diameter remains invariant.
+ *
+ * Combines:
+ * - HolePositionFromTopObjectiveFunction: bore length + hole positions from top
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - SingleTaperSimpleRatioHemiHeadObjectiveFunction: taper with hemi-head
+ *
+ * Ported from SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction.java
+ */
+export class SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Single taper, hemi-head, no hole grouping";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HolePositionFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.MOVE_BOTTOM
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new SingleTaperSimpleRatioHemiHeadObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+/**
+ * Optimization objective function for bore length, grouped hole positions,
+ * hole diameters, and a simple one-section taper with hemispherical head.
+ * The foot diameter remains invariant.
+ *
+ * Combines:
+ * - HoleGroupPositionFromTopObjectiveFunction: grouped hole positions from top
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - SingleTaperSimpleRatioHemiHeadObjectiveFunction: taper with hemi-head
+ *
+ * Ported from SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction.java
+ */
+export class SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Single taper, hemi-head, grouped hole";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    holeGroups: number[][],
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const holeGroupPos = new HoleGroupPositionFromTopObjectiveFunction(
+      calculator,
+      tuning,
+      evaluator,
+      holeGroups,
+      lengthAdjustmentMode
+    );
+    holeGroupPos.setAllowBoreSizeInterpolation(false);
+
+    this.components = [
+      holeGroupPos,
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new SingleTaperSimpleRatioHemiHeadObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+// ============================================================================
+// Calibration Objective Functions
+// ============================================================================
+
+/**
+ * Optimization objective function for calibrating transverse flute parameters.
+ * Optimizes airstream length and beta factor.
+ *
+ * Geometry dimensions:
+ * - Airstream length (dimensional)
+ * - Beta factor (dimensionless)
+ *
+ * Used to calibrate mouthpiece parameters against known instruments.
+ *
+ * Ported from FluteCalibrationObjectiveFunction.java
+ */
+export class FluteCalibrationObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece calibration";
+  static readonly DISPLAY_NAME = "Flute calibrator";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 2;
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const mouthpiece = this.calculator.getInstrument().mouthpiece;
+    const airstreamLength = mouthpiece?.embouchureHole?.airstreamLength ?? 0;
+    const beta = mouthpiece?.beta ?? 0;
+    return [airstreamLength, beta];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const mouthpiece = instrument.mouthpiece;
+
+    if (mouthpiece?.embouchureHole) {
+      mouthpiece.embouchureHole.airstreamLength = point[0]!;
+    }
+    if (mouthpiece) {
+      mouthpiece.beta = point[1]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        FluteCalibrationObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Airstream length",
+        ConstraintType.DIMENSIONAL
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        FluteCalibrationObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Beta",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      FluteCalibrationObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "FluteCalibrationObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentGeometry = this.getGeometryPoint();
+    // Airstream length: reasonable range around current value
+    // Beta: typically 0 to 1
+    this.lowerBounds = [
+      Math.max(0.001, currentGeometry[0]! * 0.5),
+      0.0,
+    ];
+    this.upperBounds = [
+      currentGeometry[0]! * 2.0,
+      1.0,
+    ];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Optimization objective function for calibrating whistle/fipple parameters.
+ * Optimizes window height and beta factor.
+ *
+ * Geometry dimensions:
+ * - Window height (dimensional)
+ * - Beta factor (dimensionless)
+ *
+ * Used to calibrate mouthpiece parameters against known instruments.
+ *
+ * Ported from WhistleCalibrationObjectiveFunction.java
+ */
+export class WhistleCalibrationObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece calibration";
+  static readonly DISPLAY_NAME = "Whistle calibrator";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 2;
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const mouthpiece = this.calculator.getInstrument().mouthpiece;
+    const windowHeight = mouthpiece?.fipple?.windowHeight ?? 0;
+    const beta = mouthpiece?.beta ?? 0;
+    return [windowHeight, beta];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const mouthpiece = instrument.mouthpiece;
+
+    if (mouthpiece?.fipple) {
+      mouthpiece.fipple.windowHeight = point[0]!;
+    }
+    if (mouthpiece) {
+      mouthpiece.beta = point[1]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        WhistleCalibrationObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Window height",
+        ConstraintType.DIMENSIONAL
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        WhistleCalibrationObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Beta",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      WhistleCalibrationObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "WhistleCalibrationObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentGeometry = this.getGeometryPoint();
+    // Window height: reasonable range around current value
+    // Beta: typically 0 to 1
+    this.lowerBounds = [
+      Math.max(0.0005, currentGeometry[0]! * 0.5),
+      0.0,
+    ];
+    this.upperBounds = [
+      currentGeometry[0]! * 2.0,
+      1.0,
+    ];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}

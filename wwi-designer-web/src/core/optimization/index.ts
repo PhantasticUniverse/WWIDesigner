@@ -97,6 +97,15 @@ export {
   HoleAndBorePositionObjectiveFunction,
   HoleAndBoreSpacingFromTopObjectiveFunction,
   GlobalBoreFromBottomObjectiveFunction,
+  GlobalHoleAndBoreFromBottomObjectiveFunction,
+  // Hemispherical bore head
+  HemisphericalBoreHead,
+  SingleTaperSimpleRatioHemiHeadObjectiveFunction,
+  SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction,
+  SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction,
+  // Calibration objectives
+  FluteCalibrationObjectiveFunction,
+  WhistleCalibrationObjectiveFunction,
 } from "./hole-position-objective.ts";
 
 // Optimization orchestrator
