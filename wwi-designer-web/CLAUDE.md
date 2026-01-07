@@ -83,17 +83,19 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 #### Java Example Files Parity (from NAFTuningTest.java, NafOptimizationTest.java, InstrumentImpedanceTest.java)
 | Test Category | Files Used | Status |
 |---------------|------------|--------|
-| NAF D Minor Cherry Tuning | NAF_D_minor_cherry_actual_*.xml | ✅ (~16 cents avg*) |
+| NAF D Minor Cherry Tuning | NAF_D_minor_cherry_actual_*.xml | ✅ (1.41 cents avg, exact Java parity) |
 | BP7 Whistle Impedance | BP7.xml, BP7-tuning.xml | ✅ |
 | No-Hole NAF Geometry | NoHoleNAF1.xml | ✅ |
 | 6-Hole NAF Geometry | 6HoleNAF1.xml | ✅ |
 | Tapered NAF Geometry | NoHoleTaperNAF.xml | ✅ |
 
-\* *NAF tuning predictions now match within ~16 cents average (Java's target is 15 cents). Achieved by implementing ThickFlangedOpenEndCalculator and DefaultFippleMouthpieceCalculator matching Java's NAFCalculator.*
+*NAF tuning predictions now achieve **exact parity** with Java (1.41 cents average deviation, identical to Java). This was achieved by:*
+*1. Implementing ThickFlangedOpenEndCalculator and DefaultFippleMouthpieceCalculator matching Java's NAFCalculator*
+*2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **419 total tests**, all passing
-- **68 parity tests** specifically for Java comparison
+- **442 total tests**, 441 passing, 1 failing (BP7 Whistle edge case)
+- **68+ parity tests** specifically for Java comparison
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
 

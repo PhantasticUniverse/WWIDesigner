@@ -1,1 +1,4 @@
 WWIDesigner/releases/2/WIDesigner-2.6/
+
+# Java compiled files
+*.class

@@ -75,8 +75,15 @@ async function main() {
   console.log(`Wave number: ${waveNumber}`);
   console.log(`All holes closed: ${fingering.openHole.every(h => !h)}`);
 
-  // Build components list
-  const components: Component[] = buildComponentsInterleaved(sortedBorePoints, sortedHoles);
+  // Build components list (starting from mouthpiece position, matching Java behavior)
+  const mouthpiecePosition = inst.mouthpiece.position;
+  const mouthpieceDiameter = inst.mouthpiece.boreDiameter ?? sortedBorePoints[0]!.boreDiameter;
+  const components: Component[] = buildComponentsInterleaved(
+    sortedBorePoints,
+    sortedHoles,
+    mouthpiecePosition,
+    mouthpieceDiameter
+  );
 
   console.log(`\n=== Components: ${components.length} ===`);
   for (let i = 0; i < components.length; i++) {
@@ -163,9 +170,15 @@ function printTransferMatrix(tm: TransferMatrix): void {
   console.log(`      UU=(${tm.getUU().re}, ${tm.getUU().im})`);
 }
 
+/**
+ * Build component list starting from mouthpiece position (matching Java behavior).
+ * Bore sections before the mouthpiece are handled as headspace in the mouthpiece calculator.
+ */
 function buildComponentsInterleaved(
   sortedBorePoints: { borePosition: number; boreDiameter: number }[],
-  sortedHoles: Hole[]
+  sortedHoles: Hole[],
+  mouthpiecePosition: number,
+  mouthpieceDiameter: number
 ): Component[] {
   const components: Component[] = [];
 
@@ -195,10 +208,16 @@ function buildComponentsInterleaved(
 
   positions.sort((a, b) => a.position - b.position);
 
-  let currentPosition = positions.length > 0 ? positions[0]!.position : 0;
-  let currentDiameter = sortedBorePoints.length > 0 ? sortedBorePoints[0]!.boreDiameter : 0.01;
+  // Start from mouthpiece position, not first bore point
+  let currentPosition = mouthpiecePosition;
+  let currentDiameter = mouthpieceDiameter;
 
   for (const item of positions) {
+    // Skip positions at or before mouthpiece (those are handled in headspace)
+    if (item.position <= mouthpiecePosition) {
+      continue;
+    }
+
     if (item.type === "hole") {
       const hole = sortedHoles[item.index]!;
       const nextDiameter = hole.boreDiameter ?? currentDiameter;
