@@ -94,7 +94,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **495 total tests**, all passing ✅
+- **556 total tests**, all passing ✅
 - **68+ parity tests** specifically for Java comparison
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
@@ -133,9 +133,9 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] LinearVInstrumentTuner - Velocity-based linear tuner
 - [x] LinearXInstrumentTuner - Reactance-based linear tuner
 
-### Remaining Features (~50% Remaining)
+### Remaining Features (~35% Remaining)
 
-#### Phase 10: Objective Functions (43 remaining from Java)
+#### Phase 10: Objective Functions (28 of 55 implemented - 51%)
 Already implemented:
 - [x] LengthObjectiveFunction - Simple bore length optimization
 - [x] HolePositionObjectiveFunction - Optimize hole positions from bottom
@@ -145,15 +145,37 @@ Already implemented:
 - [x] HoleFromTopObjectiveFunction - Combined hole position/size from top
 - [x] MergedObjectiveFunction - Abstract base for merging multiple objectives
 - [x] HoleGroupPositionObjectiveFunction - Grouped holes with equal spacing
+- [x] HoleGroupPositionFromTopObjectiveFunction - Grouped holes from top (ratio-based)
+- [x] HoleGroupFromTopObjectiveFunction - Merged grouped position + size from top
+- [x] HoleGroupObjectiveFunction - Merged grouped position + size
 - [x] BoreDiameterFromBottomObjectiveFunction - Bore diameter ratios from bottom
 - [x] BoreDiameterFromTopObjectiveFunction - Bore diameter ratios from top
 - [x] BasicTaperObjectiveFunction - Two-section tapered bore
 - [x] SingleTaperRatioObjectiveFunction - Three-section bore with single taper
+- [x] SingleTaperSimpleRatioObjectiveFunction - Three-section bore with simple taper ratio
+- [x] FippleFactorObjectiveFunction - Fipple factor calibration
+- [x] WindowHeightObjectiveFunction - Window/embouchure height calibration
+- [x] HoleAndTaperObjectiveFunction - Combined holes + taper optimization
+- [x] HoleAndBoreDiameterFromTopObjectiveFunction - Holes + bore diameters from top
+- [x] HoleAndBoreDiameterFromBottomObjectiveFunction - Holes + bore diameters from bottom
+- [x] BetaObjectiveFunction - Mouthpiece beta parameter calibration
+- [x] AirstreamLengthObjectiveFunction - Window/airstream length optimization
+- [x] NafHoleSizeObjectiveFunction - NAF-specific hole size constraints
+- [x] ReedCalibratorObjectiveFunction - Reed alpha/beta calibration
+- [x] StopperPositionObjectiveFunction - Flute headjoint stopper position
+- [x] ConicalBoreObjectiveFunction - Conical bore foot diameter
 
-Still needed:
+Still needed (27 remaining):
 - [ ] SingleTaperHoleGroupObjectiveFunction family (4+ variants)
-- [ ] FippleFactorObjectiveFunction, WindowHeightObjectiveFunction
-- [ ] Combined objectives (HoleAndBoreObjectiveFunction, etc.)
+- [ ] GlobalHoleAndBoreLengthObjectiveFunction - Global hole + bore length
+- [ ] GlobalHoleObjectiveFunction - Global combined hole optimization
+- [ ] GlobalHolePositionObjectiveFunction - Global hole positions
+- [ ] GlobalHoleSizeObjectiveFunction - Global hole sizes
+- [ ] HoleAndBoreLengthObjectiveFunction - Holes + bore length
+- [ ] SingleTaperHoleGroupObjectiveFunction - Single taper + grouped holes
+- [ ] SingleTaperHoleObjectiveFunction - Single taper + holes
+- [ ] SingleTaperLengthObjectiveFunction - Single taper + length
+- [ ] Additional merged objective variants
 
 #### Phase 12: Study Framework
 - [ ] BaseStudyModel abstraction
@@ -179,7 +201,7 @@ Still needed:
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
 | Evaluators | 8 | 7 | 88% |
-| Objective Functions | 55 | 12 | 22% |
+| Objective Functions | 55 | 28 | 51% |
 | Tuners | 5 | 5 | 100% |
 | Spectrum Analyzers | 3 | 3 | 100% |
 | Study Models | 4 | 0 | 0% |
@@ -203,12 +225,19 @@ Still needed:
 12. ~~HoleFromTopObjectiveFunction - Merged hole position/size from top~~ ✓
 13. ~~BasicTaperObjectiveFunction - Two-section tapered bore~~ ✓
 14. ~~SingleTaperRatioObjectiveFunction - Three-section single taper~~ ✓
-15. Remaining hole objectives (7+ functions)
-16. SingleTaperHoleGroup family (4+ functions)
+15. ~~FippleFactorObjectiveFunction - Fipple factor calibration~~ ✓
+16. ~~WindowHeightObjectiveFunction - Window height calibration~~ ✓
+17. ~~HoleAndTaperObjectiveFunction - Holes + taper~~ ✓
+18. ~~HoleGroupObjectiveFunction family - Grouped hole optimization~~ ✓
+19. ~~ReedCalibratorObjectiveFunction - Reed alpha/beta calibration~~ ✓
+20. ~~StopperPositionObjectiveFunction - Flute stopper position~~ ✓
+21. ~~ConicalBoreObjectiveFunction - Conical bore foot diameter~~ ✓
+22. SingleTaperHoleGroup family (4+ functions)
+23. Global objective function family
 
 **Lower Priority (Specialized):**
-17. Study framework - Application-specific workflows
-18. WhistleEvaluator (requires WhistleCalculator)
+24. Study framework - Application-specific workflows
+25. WhistleEvaluator (requires WhistleCalculator)
 
 ## Running the Web Application
 

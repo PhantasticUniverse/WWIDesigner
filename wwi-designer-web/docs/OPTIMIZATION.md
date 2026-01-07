@@ -268,6 +268,8 @@ function calcCents(target: number, predicted: number): number {
 | `FminEvaluator` | Cents from target fmin | Playing range minimum |
 | `FmaxEvaluator` | Cents from target fmax | Playing range maximum |
 | `FminmaxEvaluator` | Weighted fmin+fmax deviation | Full playing range optimization |
+| `BellNoteEvaluator` | Cents for bell note only | Bell note (all holes closed) optimization |
+| `ReflectionEvaluator` | Reflection phase angle | Resonance quality/stability |
 
 ### Playing Range Evaluators
 
@@ -324,8 +326,146 @@ class FminmaxEvaluator extends BaseEvaluator {
 ```typescript
 import { createEvaluator, EvaluatorType } from "./optimization/evaluator.ts";
 
-// Available types: "cents" | "frequency" | "reactance" | "fmin" | "fmax" | "fminmax"
+// Available types: "cents" | "frequency" | "reactance" | "fmin" | "fmax" | "fminmax" | "bellnote" | "reflection"
 const evaluator = createEvaluator("fminmax", calculator, tuner);
+```
+
+## All Objective Functions (28 Implemented)
+
+### Basic Hole Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `LengthObjectiveFunction` | 1 | Bore length from bottom |
+| `HolePositionObjectiveFunction` | N holes | Hole positions as spacing from bottom |
+| `HolePositionFromTopObjectiveFunction` | N holes | Hole positions as ratios from top |
+| `HoleSizeObjectiveFunction` | N holes | Hole diameters |
+| `HoleObjectiveFunction` | 2N | Position + size (merged) |
+| `HoleFromTopObjectiveFunction` | 2N | Position from top + size (merged) |
+| `NafHoleSizeObjectiveFunction` | N holes | NAF-specific hole sizes with max constraint |
+
+### Grouped Hole Objectives
+
+These optimize holes in groups where holes within each group maintain equal spacing.
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `HoleGroupPositionObjectiveFunction` | G groups + 1 | Grouped hole positions from bottom |
+| `HoleGroupPositionFromTopObjectiveFunction` | G groups + 1 | Grouped hole positions as ratios from top |
+| `HoleGroupFromTopObjectiveFunction` | G + N + 1 | Grouped positions from top + sizes (merged) |
+| `HoleGroupObjectiveFunction` | G + N + 1 | Grouped positions + sizes (merged) |
+
+### Bore Diameter Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `BoreDiameterFromBottomObjectiveFunction` | P points | Bore diameter ratios from bottom |
+| `BoreDiameterFromTopObjectiveFunction` | P points | Bore diameter ratios from top |
+| `ConicalBoreObjectiveFunction` | 1 | Conical bore foot diameter |
+
+### Taper Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `BasicTaperObjectiveFunction` | 3 | Two-section taper (position, bore1, bore2) |
+| `SingleTaperRatioObjectiveFunction` | 4 | Three-section taper with variable bore point count |
+| `SingleTaperSimpleRatioObjectiveFunction` | 3 | Three-section taper with simple ratio |
+
+### Combined Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `HoleAndTaperObjectiveFunction` | 2N + 4 | Holes + single taper (merged) |
+| `HoleAndBoreDiameterFromTopObjectiveFunction` | 2N + P | Holes + bore diameters from top |
+| `HoleAndBoreDiameterFromBottomObjectiveFunction` | 2N + P | Holes + bore diameters from bottom |
+
+### Mouthpiece/Fipple Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `FippleFactorObjectiveFunction` | 1 | Fipple factor calibration |
+| `WindowHeightObjectiveFunction` | 1 | Window/embouchure height |
+| `BetaObjectiveFunction` | 1 | Mouthpiece beta parameter |
+| `AirstreamLengthObjectiveFunction` | 1 | Window/airstream length |
+
+### Reed Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `ReedCalibratorObjectiveFunction` | 2 | Reed alpha + beta calibration |
+
+### Flute Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `StopperPositionObjectiveFunction` | 1 | Flute headjoint stopper position |
+
+### Bore Length Adjustment Modes
+
+Many objective functions support different bore length adjustment modes:
+
+```typescript
+enum BoreLengthAdjustmentType {
+  PRESERVE_BORE,    // Keep bore unchanged
+  PRESERVE_TAPER,   // Adjust bore to preserve taper angle
+  MOVE_BOTTOM       // Move bottom bore point
+}
+```
+
+### Example: Using HoleGroupObjectiveFunction
+
+```typescript
+import {
+  HoleGroupObjectiveFunction,
+  BoreLengthAdjustmentType
+} from "./optimization/hole-position-objective.ts";
+
+// Define hole groups: [[0,1,2], [3,4,5]] = two groups of 3 holes each
+const holeGroups = [[0, 1, 2], [3, 4, 5]];
+
+const objective = new HoleGroupObjectiveFunction(
+  calculator,
+  tuning,
+  evaluator,
+  holeGroups,
+  BoreLengthAdjustmentType.MOVE_BOTTOM
+);
+
+// Dimensions: (2 groups * 2) + (6 hole sizes) + 1 length = 11
+console.log(objective.nrDimensions); // 11
+```
+
+### Example: Using ReedCalibratorObjectiveFunction
+
+```typescript
+import { ReedCalibratorObjectiveFunction } from "./optimization/hole-position-objective.ts";
+
+// For reed instruments (single reed, double reed, or lip reed)
+const objective = new ReedCalibratorObjectiveFunction(
+  calculator,
+  tuning,
+  evaluator
+);
+
+// Dimensions: 2 (alpha + beta)
+// Optimizes mouthpiece.singleReed.alpha (or doubleReed/lipReed)
+// and mouthpiece.beta
+```
+
+### Example: Using StopperPositionObjectiveFunction
+
+```typescript
+import { StopperPositionObjectiveFunction } from "./optimization/hole-position-objective.ts";
+
+// For transverse flutes - optimizes headjoint length
+const objective = new StopperPositionObjectiveFunction(
+  calculator,
+  tuning,
+  evaluator,
+  true  // preserveTaper: adjust bore diameter to maintain taper
+);
+
+// Dimensions: 1 (distance from stopper to embouchure hole)
 ```
 
 ## Instrument Tuners

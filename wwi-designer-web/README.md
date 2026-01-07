@@ -11,7 +11,7 @@ WWIDesigner Web calculates the acoustic behavior of wind instruments using the T
 - Compare instrument designs
 - Visualize bore profiles and hole placements
 
-**Key Achievement**: All acoustic calculations achieve **exact parity** with the original Java WWIDesigner code (452 tests passing, 1.41 cents average deviation identical to Java).
+**Key Achievement**: All acoustic calculations achieve **exact parity** with the original Java WWIDesigner code (556 tests passing, 1.41 cents average deviation identical to Java).
 
 ## Quick Start
 
@@ -113,7 +113,7 @@ bun test tests/parity/
 bun test tests/core/physical-parameters.test.ts
 ```
 
-**Test Summary**: 452 tests, including 68+ parity tests against Java output.
+**Test Summary**: 556 tests, including 68+ parity tests against Java output.
 
 ## References
 
