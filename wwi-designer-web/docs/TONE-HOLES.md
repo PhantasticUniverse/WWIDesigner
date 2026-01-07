@@ -152,6 +152,7 @@ t_f = 0                        (otherwise)
 
 Typical values:
 - `fingerAdjustment = 0.01` - Default (Dickens 2007 thesis)
+- `fingerAdjustment = 0.025` - Cap volume of 15mm sphere
 - `fingerAdjustment = 0.02` - Cap volume of 13mm sphere
 - `fingerAdjustment = 0.011` - Cap height of 13mm sphere
 - `fingerAdjustment = 0.0` - NAF calculator (no adjustment)

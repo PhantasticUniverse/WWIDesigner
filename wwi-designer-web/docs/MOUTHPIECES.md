@@ -137,7 +137,7 @@ class SimpleFippleMouthpieceCalculator {
 
     const Xw = (params.getRho() * freq) / effSize * (4.3 + 2.87 * windowHeight / effSize);
 
-    const radius = 0.5 * mouthpiece.boreDiameter;
+    const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
     const Rw = Tube.calcR(freq, radius, params) +
                (params.getRho() * 0.0184 * Math.sqrt(freq) * windowHeight) /
                (effSize * effSize * effSize);
@@ -235,7 +235,7 @@ class DefaultFippleMouthpieceCalculator {
   calcTransferMatrix(mouthpiece, waveNumber, params): TransferMatrix {
     this.mParams = new SimplePhysicalParameters(params);
 
-    const radius = 0.5 * mouthpiece.boreDiameter;
+    const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
     const z0 = params.calcZ0(radius);
     const omega = waveNumber * params.getSpeedOfSound();
     const k_delta_l = this.calcKDeltaL(mouthpiece, omega, z0);

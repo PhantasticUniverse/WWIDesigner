@@ -223,6 +223,8 @@ where ε = α / (r·√k)
 
 Typical values: ~3×10⁻⁵
 
+**Implementation Note**: The Java implementation stores both `mAlphaConstant` and a precomputed `mEpsilonConstant` (= α/√k). The TypeScript implementation stores only `alphaConstant` and computes ε dynamically at each frequency using `α / (r·√k)`. Both approaches yield identical results; the TypeScript approach avoids redundant state while the Java approach trades memory for marginally faster repeated calculations.
+
 ## Usage Example
 
 ```typescript

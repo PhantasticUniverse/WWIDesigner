@@ -137,9 +137,11 @@ This model interpolates between unflanged and infinite-flanged cases based on th
 ### Constants
 
 ```typescript
-const DELTA_INF = 0.8216;  // End correction for infinite flange
+const DELTA_INF = 0.8216;  // End correction for infinite flange (≈ 0.82159 from Silva)
 const DELTA_0 = 0.6133;    // End correction for unflanged
 ```
+
+**Note**: The constant `DELTA_INF = 0.8216` is a truncated form of `0.82159` from Silva et al. (2008). Both values appear in the literature; the Java/TypeScript implementation uses `0.8216` for the thick-flanged interpolation while `0.82159` is used in the exact flanged radiation formulas. The difference (0.01%) is negligible for practical calculations.
 
 ### Geometry
 

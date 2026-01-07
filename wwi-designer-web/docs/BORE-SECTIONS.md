@@ -91,14 +91,16 @@ static calcCylinderMatrix(
 For a cone (tapered section), the transfer matrix is more complex. From Lefebvre & Kergomard:
 
 ```
-     ┌                                    ┐
-     │  A(r_L/r_S) - B·cot(θ_in)     C    │
-T =  │                                    │
-     │           D                   E    │
-     └                                    ┘
+     ┌           ┐
+T =  │  A    B   │
+     │           │
+     │  C    D   │
+     └           ┘
 ```
 
-Where:
+Where the matrix elements A, B, C, D are defined below (see "Matrix Elements" section).
+
+Parameters:
 - r_S = source radius (input end)
 - r_L = load radius (output end)
 - L = cone length
