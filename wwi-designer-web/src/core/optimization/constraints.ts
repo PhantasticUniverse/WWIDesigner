@@ -229,6 +229,44 @@ export class Constraints {
   }
 
   /**
+   * Add all constraints from another Constraints object.
+   */
+  addConstraints(other: Constraints): void {
+    for (const constraint of other.getConstraints()) {
+      this.constraints.push({ ...constraint });
+    }
+    // Merge bounds
+    const otherLower = other.getLowerBounds();
+    const otherUpper = other.getUpperBounds();
+    this.lowerBounds.push(...otherLower);
+    this.upperBounds.push(...otherUpper);
+  }
+
+  /**
+   * Clear constraints in a specific category.
+   */
+  clearConstraints(category: string): void {
+    this.constraints = this.constraints.filter(
+      (c) => c.category !== category
+    );
+  }
+
+  /**
+   * Set hole groups for grouped hole optimization.
+   */
+  setHoleGroups(groups: number[][]): void {
+    // Store hole groups (used by UI for constraint display)
+    (this as any).holeGroups = groups;
+  }
+
+  /**
+   * Get hole groups for grouped hole optimization.
+   */
+  getHoleGroups(): number[][] | undefined {
+    return (this as any).holeGroups;
+  }
+
+  /**
    * Clone this constraints object.
    */
   clone(): Constraints {
@@ -240,6 +278,10 @@ export class Constraints {
     copy.objectiveDisplayName = this.objectiveDisplayName;
     copy.objectiveFunctionName = this.objectiveFunctionName;
     copy.constraintsName = this.constraintsName;
+    const groups = this.getHoleGroups();
+    if (groups) {
+      copy.setHoleGroups(groups.map(g => [...g]));
+    }
     return copy;
   }
 }

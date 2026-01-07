@@ -20,6 +20,12 @@ export {
   CentDeviationEvaluator,
   FrequencyDeviationEvaluator,
   ReactanceEvaluator,
+  FminEvaluator,
+  FmaxEvaluator,
+  FminmaxEvaluator,
+  BellNoteEvaluator,
+  ReflectionEvaluator,
+  type EvaluatorType,
   createEvaluator,
 } from "./evaluator.ts";
 
@@ -38,11 +44,15 @@ export {
   OptimizerType,
 } from "./base-objective-function.ts";
 
-// Hole optimization objective functions
+// Hole and bore optimization objective functions
 export {
+  LengthObjectiveFunction,
   HolePositionObjectiveFunction,
   HoleSizeObjectiveFunction,
   HoleObjectiveFunction,
+  MergedObjectiveFunction,
+  HoleGroupPositionObjectiveFunction,
+  BoreDiameterFromBottomObjectiveFunction,
   BoreLengthAdjustmentType,
 } from "./hole-position-objective.ts";
 
