@@ -4010,3 +4010,697 @@ export class HoleAndHeadjointObjectiveFunction extends MergedObjectiveFunction {
     this.constraints.setConstraintsName("Default");
   }
 }
+
+// ============================================================================
+// Bore Position and Spacing Objective Functions
+// ============================================================================
+
+/**
+ * Optimization objective function for relative position of existing bore points.
+ *
+ * Geometry dimensions:
+ * - Absolute position of bottom bore point (if bottomPointUnchanged is false)
+ * - For interior bore points down to the bottom, distance from prior bore point
+ *   to this bore point, as a fraction of the distance from the prior bore point
+ *   to the bottom
+ *
+ * The bore points to vary can be specified as a number of bore points or with a
+ * bore point name. The positions of bore points above these are left unchanged.
+ * Bore point diameters are invariant.
+ *
+ * Do not use with other optimizers that might change the number of bore points.
+ * Specify bottomPointUnchanged = true to use with optimizers that might change
+ * the bottom bore position.
+ *
+ * Ported from BorePositionObjectiveFunction.java
+ */
+export class BorePositionObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Bore point positions";
+  static readonly DISPLAY_NAME = "Bore Position optimizer";
+
+  // Number of invariant bore points at the top of the instrument.
+  protected readonly unchangedBorePoints: number;
+  // Set to 1 if bottom bore point is left unchanged
+  protected readonly unchangedBottomPoint: number;
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number,
+    bottomPointUnchanged: boolean = false
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrBorePoints = calculator.getInstrument().borePoint.length;
+
+    this.unchangedBottomPoint = bottomPointUnchanged ? 1 : 0;
+
+    if (unchangedBorePoints === undefined) {
+      // Default: find top of body
+      this.unchangedBorePoints =
+        BoreDiameterFromBottomObjectiveFunction.getTopOfBody(
+          calculator.getInstrument()
+        ) + 1;
+    } else if (unchangedBorePoints >= 1) {
+      this.unchangedBorePoints = unchangedBorePoints;
+    } else {
+      // At a minimum, top bore point is unchanged
+      this.unchangedBorePoints = 1;
+    }
+
+    this.nrDimensions =
+      nrBorePoints - this.unchangedBorePoints - this.unchangedBottomPoint;
+
+    if (this.nrDimensions > 1) {
+      this.optimizerType = OptimizerType.BOBYQA;
+    } else {
+      this.optimizerType = OptimizerType.BRENT;
+    }
+
+    this.maxEvaluations = 10000;
+    this.setConstraints();
+  }
+
+  /**
+   * Convert a dimension number in 0 .. nrDimensions-1
+   * to a bore point number in unchangedBorePoints+1 .. nrBorePoints.
+   */
+  protected borePointNr(dimensionIdx: number): number {
+    const nrBorePoints =
+      this.nrDimensions + this.unchangedBorePoints + this.unchangedBottomPoint;
+
+    if (dimensionIdx === 0 && this.unchangedBottomPoint === 0) {
+      // First dimension is bottom bore point
+      return nrBorePoints;
+    }
+    // Process remaining bore points in order, from top to bottom
+    return (
+      this.unchangedBorePoints + dimensionIdx + this.unchangedBottomPoint
+    );
+  }
+
+  /**
+   * Point number used as an initial reference for the first changed point.
+   */
+  protected referencePointNr(): number {
+    return this.unchangedBorePoints;
+  }
+
+  getGeometryPoint(): number[] {
+    const geometry = new Array(this.nrDimensions);
+    let dimension = 0;
+
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+    let borePoint = sortedPoints[sortedPoints.length - 1]!;
+    const lastBorePosition = borePoint.borePosition;
+
+    if (this.unchangedBottomPoint === 0) {
+      geometry[0] = borePoint.borePosition;
+      dimension = 1;
+    }
+
+    borePoint = sortedPoints[this.referencePointNr() - 1]!;
+    let priorBorePosition = borePoint.borePosition;
+
+    for (; dimension < this.nrDimensions; dimension++) {
+      const pointNr = this.borePointNr(dimension);
+      borePoint = sortedPoints[pointNr - 1]!;
+      geometry[dimension] =
+        (borePoint.borePosition - priorBorePosition) /
+        (lastBorePosition - priorBorePosition);
+      priorBorePosition = borePoint.borePosition;
+    }
+
+    return geometry;
+  }
+
+  setGeometryPoint(point: number[]): void {
+    let dimension = 0;
+
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+    let borePoint = sortedPoints[sortedPoints.length - 1]!;
+
+    if (this.unchangedBottomPoint === 0) {
+      borePoint.borePosition = point[0]!;
+      dimension = 1;
+    }
+    const lastBorePosition = borePoint.borePosition;
+
+    borePoint = sortedPoints[this.referencePointNr() - 1]!;
+    let priorBorePosition = borePoint.borePosition;
+
+    for (; dimension < this.nrDimensions; dimension++) {
+      const pointNr = this.borePointNr(dimension);
+      borePoint = sortedPoints[pointNr - 1]!;
+      borePoint.borePosition =
+        priorBorePosition +
+        point[dimension]! * (lastBorePosition - priorBorePosition);
+      priorBorePosition = borePoint.borePosition;
+    }
+  }
+
+  override setLowerBounds(aLowerBounds: number[]): void {
+    if (this.unchangedBottomPoint === 0) {
+      // Adjust first lower bound to keep bottom bore point below the bottom hole
+      const sortedHoles = getSortedHoles(this.calculator.getInstrument());
+      let bottomHolePosition: number;
+
+      if (sortedHoles.length > 0) {
+        bottomHolePosition = sortedHoles[sortedHoles.length - 1]!.position;
+      } else {
+        // No holes. Use mid-point of bore.
+        const sortedPoints = getSortedBorePoints(
+          this.calculator.getInstrument()
+        );
+        bottomHolePosition =
+          0.5 *
+          (sortedPoints[0]!.borePosition +
+            sortedPoints[sortedPoints.length - 1]!.borePosition);
+      }
+
+      if (aLowerBounds[0]! < bottomHolePosition + 0.012) {
+        // Raise the lower bound to restrict bottom bore position
+        aLowerBounds[0] = bottomHolePosition + 0.012;
+      }
+    }
+    super.setLowerBounds(aLowerBounds);
+  }
+
+  protected setConstraints(): void {
+    const nrBorePoints =
+      this.nrDimensions + this.unchangedBorePoints + this.unchangedBottomPoint;
+    let dimension = 0;
+
+    if (this.unchangedBottomPoint === 0) {
+      const pointNr = this.borePointNr(0);
+      const name = `Position of bore point ${pointNr} (bottom)`;
+      this.constraints.addConstraint(
+        createConstraint(
+          BorePositionObjectiveFunction.CONSTRAINT_CATEGORY,
+          name,
+          ConstraintType.DIMENSIONAL
+        )
+      );
+      dimension = 1;
+    }
+
+    for (; dimension < this.nrDimensions; dimension++) {
+      const pointNr = this.borePointNr(dimension);
+      const name = `Relative position of bore point ${pointNr} between points ${pointNr - 1} and ${nrBorePoints}`;
+      this.constraints.addConstraint(
+        createConstraint(
+          BorePositionObjectiveFunction.CONSTRAINT_CATEGORY,
+          name,
+          ConstraintType.DIMENSIONLESS
+        )
+      );
+    }
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      BorePositionObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("BorePositionObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentGeometry = this.getGeometryPoint();
+
+    this.lowerBounds = currentGeometry.map((v, i) => {
+      if (i === 0 && this.unchangedBottomPoint === 0) {
+        // Bottom bore position: reasonable minimum
+        return Math.max(0.1, v * 0.8);
+      }
+      // Relative positions: 0 to 1
+      return Math.max(0.0, v * 0.5);
+    });
+
+    this.upperBounds = currentGeometry.map((v, i) => {
+      if (i === 0 && this.unchangedBottomPoint === 0) {
+        return v * 1.2;
+      }
+      return Math.min(1.0, v * 2.0);
+    });
+
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Optimization objective function for positioning existing bore points at
+ * top of bore using absolute spacing.
+ *
+ * Geometry dimensions:
+ * - For bore points from the top down, spacing from this bore point to next
+ *   bore point
+ *
+ * The bore points to vary can be specified as a number of bore points or with a
+ * bore point name. The positions of bore points below these are left unchanged.
+ * Bore point diameters are unchanged.
+ *
+ * Do not use with other optimizers that might change the number of bore points.
+ *
+ * Ported from BoreSpacingFromTopObjectiveFunction.java
+ */
+export class BoreSpacingFromTopObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Bore point positions";
+  static readonly DISPLAY_NAME = "Bore Spacing (from top) optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number | string
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrBorePoints = calculator.getInstrument().borePoint.length;
+
+    if (changedBorePoints === undefined) {
+      // Default: find lowest point with "Head" in name
+      this.nrDimensions = BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        calculator.getInstrument(),
+        "Head"
+      );
+    } else if (typeof changedBorePoints === "string") {
+      this.nrDimensions = BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        calculator.getInstrument(),
+        changedBorePoints
+      );
+    } else {
+      this.nrDimensions = changedBorePoints;
+    }
+
+    // At least the top bore point is left unchanged
+    if (this.nrDimensions >= nrBorePoints) {
+      this.nrDimensions = nrBorePoints - 1;
+    }
+
+    // At least one bore point is changed
+    if (this.nrDimensions < 1) {
+      this.nrDimensions = 1;
+    }
+
+    if (this.nrDimensions > 1) {
+      this.optimizerType = OptimizerType.BOBYQA;
+    } else {
+      this.optimizerType = OptimizerType.BRENT;
+    }
+
+    this.maxEvaluations = 10000;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const geometry = new Array(this.nrDimensions);
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+
+    let borePoint = sortedPoints[0]!;
+    let priorBorePosition = borePoint.borePosition;
+
+    for (let dimension = 0; dimension < this.nrDimensions; dimension++) {
+      borePoint = sortedPoints[dimension + 1]!;
+      geometry[dimension] = borePoint.borePosition - priorBorePosition;
+      priorBorePosition = borePoint.borePosition;
+    }
+
+    return geometry;
+  }
+
+  setGeometryPoint(point: number[]): void {
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+
+    let borePoint = sortedPoints[0]!;
+    let priorBorePosition = borePoint.borePosition;
+
+    for (let dimension = 0; dimension < this.nrDimensions; dimension++) {
+      borePoint = sortedPoints[dimension + 1]!;
+      borePoint.borePosition = priorBorePosition + point[dimension]!;
+      priorBorePosition = borePoint.borePosition;
+    }
+  }
+
+  override setUpperBounds(aUpperBounds: number[]): void {
+    // If necessary, adjust upper bounds to prevent changing order of bore points
+    if (
+      this.nrDimensions + 1 <
+      this.calculator.getInstrument().borePoint.length
+    ) {
+      const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+      const topPosition = sortedPoints[0]!.borePosition;
+      const unchangedPosition =
+        sortedPoints[this.nrDimensions + 1]!.borePosition;
+      const availableSpace = unchangedPosition - topPosition;
+
+      let upperBound = 0.0;
+      for (let dimension = 0; dimension < this.nrDimensions; dimension++) {
+        upperBound += aUpperBounds[dimension]!;
+      }
+
+      if (upperBound + 0.0001 > availableSpace) {
+        const reduction = availableSpace / (upperBound + 0.0001);
+        for (let dimension = 0; dimension < this.nrDimensions; dimension++) {
+          aUpperBounds[dimension] = aUpperBounds[dimension]! * reduction;
+        }
+      }
+    }
+    super.setUpperBounds(aUpperBounds);
+  }
+
+  protected setConstraints(): void {
+    for (let dimension = 0; dimension < this.nrDimensions; dimension++) {
+      const name = `Distance from bore point ${dimension + 1} to point ${dimension + 2}`;
+      this.constraints.addConstraint(
+        createConstraint(
+          BoreSpacingFromTopObjectiveFunction.CONSTRAINT_CATEGORY,
+          name,
+          ConstraintType.DIMENSIONAL
+        )
+      );
+    }
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      BoreSpacingFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "BoreSpacingFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentGeometry = this.getGeometryPoint();
+
+    // Spacing: reasonable range around current values
+    this.lowerBounds = currentGeometry.map((v) => Math.max(0.001, v * 0.5));
+    this.upperBounds = currentGeometry.map((v) => v * 2.0);
+
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Optimization objective function for diameter and relative position
+ * of existing bore points at bottom of bore.
+ *
+ * Combines:
+ * - BorePositionObjectiveFunction: relative bore point positions
+ * - BoreDiameterFromBottomObjectiveFunction: bore diameters from bottom
+ *
+ * Use of diameter ratios rather than absolute diameters allows constraints
+ * to control the direction of taper. If lower bound is 1.0, bore flares out
+ * toward bottom; if upper bound is 1.0, bore tapers inward toward bottom.
+ *
+ * Ported from BoreFromBottomObjectiveFunction.java
+ */
+export class BoreFromBottomObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME =
+    "Bore point position and diameter, from bottom, optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrUnchanged =
+      unchangedBorePoints ??
+      BoreDiameterFromBottomObjectiveFunction.getTopOfBody(
+        calculator.getInstrument()
+      ) + 1;
+
+    this.components = [
+      new BorePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrUnchanged,
+        false // bottomPointUnchanged = false
+      ),
+      new BoreDiameterFromBottomObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrUnchanged
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 40000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      BoreFromBottomObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "BoreFromBottomObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 0.8e-6;
+  }
+}
+
+/**
+ * Optimization objective function for hole positions and diameters, and
+ * diameters and relative positions of existing bore points at the bottom
+ * of the bore.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - BorePositionObjectiveFunction: relative bore point positions (bottomPointUnchanged=true)
+ * - BoreDiameterFromBottomObjectiveFunction: bore diameters from bottom
+ *
+ * Ported from HoleAndBoreFromBottomObjectiveFunction.java
+ */
+export class HoleAndBoreFromBottomObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Hole and bore (from bottom) optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrUnchanged =
+      unchangedBorePoints ??
+      BoreDiameterFromBottomObjectiveFunction.getTopOfBody(
+        calculator.getInstrument()
+      ) + 1;
+
+    // Since BorePositionObjectiveFunction uses ratios from the bottom
+    // (intra-bell ratios), PRESERVE_BELL may have less impact on those
+    // geometry dimensions than MOVE_BOTTOM.
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.PRESERVE_LENGTH // PRESERVE_BELL equivalent
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new BorePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrUnchanged,
+        true // bottomPointUnchanged = true
+      ),
+      new BoreDiameterFromBottomObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrUnchanged
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 60000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndBoreFromBottomObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndBoreFromBottomObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 0.9e-6;
+  }
+}
+
+/**
+ * Optimization objective function for hole positions and diameters, and
+ * relative positions of existing bore points at the bottom of the bore.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - BorePositionObjectiveFunction: relative bore point positions
+ *
+ * Bore point diameters are invariant.
+ *
+ * Ported from HoleAndBorePositionObjectiveFunction.java
+ */
+export class HoleAndBorePositionObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME =
+    "Hole, plus bore-point position from bottom, optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrUnchanged =
+      unchangedBorePoints ??
+      BoreDiameterFromBottomObjectiveFunction.getTopOfBody(
+        calculator.getInstrument()
+      ) + 1;
+
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.PRESERVE_LENGTH // PRESERVE_BELL equivalent
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new BorePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        nrUnchanged,
+        true // bottomPointUnchanged = true
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 50000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndBorePositionObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndBorePositionObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 0.9e-6;
+  }
+}
+
+/**
+ * Optimization objective function for hole positions and diameters, and
+ * positions of existing bore points from the top of the bore.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - BoreSpacingFromTopObjectiveFunction: bore point spacing from top
+ *
+ * Bore point diameters are unchanged.
+ *
+ * Ported from HoleAndBoreSpacingFromTopObjectiveFunction.java
+ */
+export class HoleAndBoreSpacingFromTopObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME =
+    "Hole, plus bore-point spacing from top, optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number | string
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrChanged =
+      changedBorePoints ??
+      BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        calculator.getInstrument(),
+        "Head"
+      );
+
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.PRESERVE_TAPER
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new BoreSpacingFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        typeof nrChanged === "number" ? nrChanged : undefined
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 50000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndBoreSpacingFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndBoreSpacingFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 0.9e-6;
+  }
+}
+
+/**
+ * Global optimization variant of BoreFromBottomObjectiveFunction.
+ * Uses DIRECT global optimizer for more thorough exploration.
+ *
+ * Ported from GlobalBoreFromBottomObjectiveFunction.java
+ */
+export class GlobalBoreFromBottomObjectiveFunction extends BoreFromBottomObjectiveFunction {
+  static override readonly DISPLAY_NAME =
+    "Bore point, from bottom, global optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator, unchangedBorePoints);
+    this.optimizerType = OptimizerType.DIRECT;
+    this.maxEvaluations = 40000;
+    this.constraints.setObjectiveDisplayName(
+      GlobalBoreFromBottomObjectiveFunction.DISPLAY_NAME
+    );
+  }
+}

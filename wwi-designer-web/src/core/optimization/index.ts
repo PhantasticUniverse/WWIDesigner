@@ -89,6 +89,14 @@ export {
   HoleAndConicalBoreObjectiveFunction,
   HeadjointObjectiveFunction,
   HoleAndHeadjointObjectiveFunction,
+  // Bore position and spacing objectives
+  BorePositionObjectiveFunction,
+  BoreSpacingFromTopObjectiveFunction,
+  BoreFromBottomObjectiveFunction,
+  HoleAndBoreFromBottomObjectiveFunction,
+  HoleAndBorePositionObjectiveFunction,
+  HoleAndBoreSpacingFromTopObjectiveFunction,
+  GlobalBoreFromBottomObjectiveFunction,
 } from "./hole-position-objective.ts";
 
 // Optimization orchestrator

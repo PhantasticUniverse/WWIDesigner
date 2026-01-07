@@ -49,6 +49,14 @@ import {
   HoleAndConicalBoreObjectiveFunction,
   HeadjointObjectiveFunction,
   HoleAndHeadjointObjectiveFunction,
+  // Bore position and spacing objectives
+  BorePositionObjectiveFunction,
+  BoreSpacingFromTopObjectiveFunction,
+  BoreFromBottomObjectiveFunction,
+  HoleAndBoreFromBottomObjectiveFunction,
+  HoleAndBorePositionObjectiveFunction,
+  HoleAndBoreSpacingFromTopObjectiveFunction,
+  GlobalBoreFromBottomObjectiveFunction,
 } from "../../../src/core/optimization/hole-position-objective.ts";
 import { OptimizerType } from "../../../src/core/optimization/base-objective-function.ts";
 import { CentDeviationEvaluator } from "../../../src/core/optimization/evaluator.ts";
@@ -3421,6 +3429,688 @@ describe("Objective Functions", () => {
       for (let i = 0; i < geometry.length; i++) {
         expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
       }
+    });
+  });
+
+  // ============================================================================
+  // Bore Position and Spacing Objective Functions
+  // ============================================================================
+
+  describe("BorePositionObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates with correct dimensions and optimizer", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2 // Leave 2 bore points unchanged from top
+      );
+
+      // 5 bore points - 2 unchanged from top = 3 dimensions
+      expect(objective.getNrDimensions()).toBe(3);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 6);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+
+    test("with bottomPointUnchanged=true", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2,
+        true // bottomPointUnchanged
+      );
+
+      // 5 bore points - 2 unchanged from top - 1 unchanged at bottom = 2 dimensions
+      expect(objective.getNrDimensions()).toBe(2);
+    });
+  });
+
+  describe("BoreSpacingFromTopObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates with correct dimensions", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        3 // Change 3 bore points from top
+      );
+
+      expect(objective.getNrDimensions()).toBe(3);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+    });
+
+    test("geometry contains spacings", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+
+      // First spacing: 50mm = 0.05m (values are in meters)
+      expect(geometry[0]).toBeCloseTo(0.05, 6);
+      // Second spacing: 100 - 50 = 50mm = 0.05m
+      expect(geometry[1]).toBeCloseTo(0.05, 6);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 6);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("BoreFromBottomObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates merged objective with correct components", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // Combined dimensions from BorePosition + BoreDiameterFromBottom
+      expect(objective.getNrDimensions()).toBeGreaterThan(0);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+      expect(objective.getMaxEvaluations()).toBe(40000);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("HoleAndBoreFromBottomObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates merged objective with all components", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // Combined dimensions: HolePosition + HoleSize + BorePosition + BoreDiameter
+      expect(objective.getNrDimensions()).toBeGreaterThan(6);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+      expect(objective.getMaxEvaluations()).toBe(60000);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("HoleAndBorePositionObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates merged objective", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // Combined dimensions: HolePosition + HoleSize + BorePosition
+      expect(objective.getNrDimensions()).toBeGreaterThan(6);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+      expect(objective.getMaxEvaluations()).toBe(50000);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBorePositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("HoleAndBoreSpacingFromTopObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates merged objective", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // Combined dimensions: HolePosition + HoleSize + BoreSpacing
+      expect(objective.getNrDimensions()).toBeGreaterThan(6);
+      expect(objective.getOptimizerType()).toBe(OptimizerType.BOBYQA);
+      expect(objective.getMaxEvaluations()).toBe(50000);
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreSpacingFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("GlobalBoreFromBottomObjectiveFunction", () => {
+    const createMultiBoreInstrument = (): Instrument => ({
+      name: "Multi-bore Instrument",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16, name: "Head" },
+        { borePosition: 50, boreDiameter: 16, name: "Head" },
+        { borePosition: 100, boreDiameter: 17, name: "Body" },
+        { borePosition: 200, boreDiameter: 18 },
+        { borePosition: 300, boreDiameter: 18 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("uses DIRECT optimizer", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new GlobalBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      expect(objective.getOptimizerType()).toBe(OptimizerType.DIRECT);
+      expect(objective.getMaxEvaluations()).toBe(40000);
+    });
+
+    test("has same dimensions as non-global variant", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const globalObj = new GlobalBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // Create a fresh calculator for the non-global version
+      const inst2 = createMultiBoreInstrument();
+      const calc2 = new DefaultInstrumentCalculator(inst2, params);
+      const evaluator2 = new CentDeviationEvaluator(calc2);
+
+      const localObj = new BoreFromBottomObjectiveFunction(
+        calc2,
+        tuning,
+        evaluator2,
+        2
+      );
+
+      expect(globalObj.getNrDimensions()).toBe(localObj.getNrDimensions());
+    });
+
+    test("geometry round-trips", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new GlobalBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      expect(newGeometry.length).toBe(geometry.length);
+      for (let i = 0; i < geometry.length; i++) {
+        expect(newGeometry[i]).toBeCloseTo(geometry[i]!, 1);
+      }
+    });
+
+    test("value returns finite error", () => {
+      const inst = createMultiBoreInstrument();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(inst, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new GlobalBoreFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
     });
   });
 });
