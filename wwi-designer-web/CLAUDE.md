@@ -64,7 +64,32 @@ Tests are critical for verifying Java parity. Each acoustic calculation should h
 - [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
 - [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
 - [x] Phase 6: Optimization (DIRECT algorithm, evaluators, objective functions)
-- [ ] Phase 7: Web UI
+- [x] Phase 7: Web UI (Bun.serve, instrument/tuning editors, visualization, optimization)
+
+## Running the Web Application
+
+Start the development server:
+```sh
+bun run dev
+```
+
+Or for production:
+```sh
+bun run start
+```
+
+The server will be available at http://localhost:3000
+
+## Web UI Features
+
+- **Instrument Editor**: Create and edit instrument geometry (bore points, holes, mouthpiece, termination)
+- **Tuning Editor**: Define target tunings with note names, frequencies, and fingering patterns
+- **Instrument Sketch**: Visual cross-section view of the instrument bore and holes
+- **Tuning Analysis**: Calculate predicted vs. target frequencies with cent deviations
+- **Optimization**: Optimize hole positions, sizes, or both using DIRECT algorithm
+- **Instrument Comparison**: Side-by-side comparison of two instruments
+- **XML Import/Export**: Save and load instruments in XML format
+- **Preferences**: Configure temperature, humidity, and other calculation parameters
 
 ---
 
