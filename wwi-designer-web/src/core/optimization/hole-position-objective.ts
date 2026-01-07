@@ -1215,3 +1215,431 @@ export class BoreDiameterFromBottomObjectiveFunction extends BaseObjectiveFuncti
     this.constraints.setUpperBounds(this.upperBounds);
   }
 }
+
+/**
+ * Objective function for bore length and hole positions, with the
+ * top hole position expressed as a fraction of bore length.
+ *
+ * Geometry dimensions:
+ * - Position of end bore point
+ * - Position of top hole as fraction of bore length (dimensionless)
+ * - For each subsequent hole, spacing below to the next hole
+ *
+ * Ported from HolePositionFromTopObjectiveFunction.java
+ */
+export class HolePositionFromTopObjectiveFunction extends HolePositionObjectiveFunction {
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator, lengthAdjustmentMode);
+    // Re-set constraints to use the overridden version
+    this.setConstraints();
+  }
+
+  /**
+   * Retrieve geometry values from the instrument.
+   * @returns [boreLength, topHoleRatio, spacing2, ..., spacingN]
+   */
+  override getGeometryPoint(): number[] {
+    const instrument = this.calculator.getInstrument();
+    const sortedHoles = getSortedHoles(instrument);
+    const geometry = new Array(this.nrDimensions);
+
+    // First dimension is bore length
+    geometry[0] = this.getEndOfBore();
+    let priorHolePosition = 0;
+
+    // Process holes from top to bottom
+    for (let i = 0; i < sortedHoles.length; i++) {
+      const hole = sortedHoles[i]!;
+      geometry[i + 1] = hole.position - priorHolePosition;
+      if (i === 0) {
+        // Convert top hole position to ratio
+        geometry[i + 1] = this.getTopRatio(geometry[0], geometry[1]);
+      }
+      priorHolePosition = hole.position;
+    }
+
+    return geometry;
+  }
+
+  /**
+   * Set geometry values on the instrument.
+   */
+  override setGeometryPoint(point: number[]): void {
+    // Adjust bore based on new length
+    this.setBoreFromPoint(point);
+
+    const instrument = this.calculator.getInstrument();
+    const sortedHoles = getSortedHoles(instrument);
+
+    let priorHolePosition = 0;
+
+    // Process holes from top to bottom
+    for (let i = 0; i < sortedHoles.length; i++) {
+      const hole = sortedHoles[i]!;
+      let holePosition = priorHolePosition + point[i + 1]!;
+      if (i === 0) {
+        // Convert ratio back to absolute position
+        holePosition = this.getTopPosition(point[0]!, point[i + 1]!);
+      }
+      hole.position = holePosition;
+      priorHolePosition = holePosition;
+    }
+  }
+
+  /**
+   * Get the position of the farthest bore point (end of bore).
+   */
+  private getEndOfBore(): number {
+    const borePoints = this.calculator.getInstrument().borePoint;
+    let endPosition = borePoints[0]?.borePosition ?? 0;
+
+    for (const bp of borePoints) {
+      if (bp.borePosition > endPosition) {
+        endPosition = bp.borePosition;
+      }
+    }
+    return endPosition;
+  }
+
+  /**
+   * Adjust the bore profile based on the new bore length in point[0].
+   */
+  private setBoreFromPoint(point: number[]): void {
+    const newBoreLength = point[0]!;
+    const instrument = this.calculator.getInstrument();
+    const sortedBorePoints = getSortedBorePoints(instrument);
+
+    if (sortedBorePoints.length < 2) return;
+
+    const topPosition = sortedBorePoints[0]!.borePosition;
+    const oldBoreLength =
+      sortedBorePoints[sortedBorePoints.length - 1]!.borePosition;
+
+    const lengthAdjustmentMode = this.getLengthAdjustmentMode();
+
+    switch (lengthAdjustmentMode) {
+      case BoreLengthAdjustmentType.MOVE_BOTTOM:
+        // Just move the last bore point
+        sortedBorePoints[sortedBorePoints.length - 1]!.borePosition =
+          newBoreLength;
+        break;
+
+      case BoreLengthAdjustmentType.PRESERVE_TAPER:
+        // Scale all bore points proportionally
+        if (oldBoreLength - topPosition > 0) {
+          const ratio =
+            (newBoreLength - topPosition) / (oldBoreLength - topPosition);
+          for (let i = 1; i < sortedBorePoints.length; i++) {
+            const bp = sortedBorePoints[i]!;
+            bp.borePosition =
+              topPosition + (bp.borePosition - topPosition) * ratio;
+          }
+        }
+        break;
+
+      case BoreLengthAdjustmentType.PRESERVE_LENGTH:
+        // Don't adjust bore - keep original length
+        break;
+    }
+  }
+
+  /**
+   * Calculates the top hole position as a ratio to the bore length.
+   * Top hole ratio is measured from the splitting edge (mouthpiece position)
+   * for both numerator and denominator.
+   */
+  private getTopRatio(boreLength: number, topHolePosition: number): number {
+    const realOrigin =
+      this.calculator.getInstrument().mouthpiece?.position ?? 0;
+    return (topHolePosition - realOrigin) / (boreLength - realOrigin);
+  }
+
+  /**
+   * Convert top hole ratio back to absolute position.
+   * @param boreLength - Measured from arbitrary origin
+   * @param topHoleRatio - Ratio of top hole position to bore length,
+   *                       both measured from splitting edge
+   * @returns Top hole position, measured from arbitrary origin
+   */
+  private getTopPosition(boreLength: number, topHoleRatio: number): number {
+    const realOrigin =
+      this.calculator.getInstrument().mouthpiece?.position ?? 0;
+    const boreLengthFromEdge = boreLength - realOrigin;
+    const topHolePosition = topHoleRatio * boreLengthFromEdge + realOrigin;
+    return topHolePosition;
+  }
+
+  /**
+   * Set up constraints for this objective function.
+   */
+  protected override setConstraints(): void {
+    const instrument = this.calculator.getInstrument();
+    const sortedHoles = getSortedHoles(instrument);
+    const nHoles = sortedHoles.length;
+
+    // First constraint: bore length (dimensional)
+    this.constraints.addConstraint(
+      createConstraint(
+        HolePositionObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Bore length",
+        ConstraintType.DIMENSIONAL
+      )
+    );
+
+    // Constraints for hole positions from top down
+    for (let i = nHoles, idx = 0; i > 0; i--, idx++) {
+      const holeName = sortedHoles[idx]?.name ?? getHoleName(i, nHoles);
+
+      if (idx === 0) {
+        // Top hole: dimensionless ratio
+        this.constraints.addConstraint(
+          createConstraint(
+            HolePositionObjectiveFunction.CONSTRAINT_CATEGORY,
+            `Bore top to ${holeName}, bore-length fraction`,
+            ConstraintType.DIMENSIONLESS
+          )
+        );
+      } else {
+        // Other holes: dimensional distance
+        const priorName =
+          sortedHoles[idx - 1]?.name ?? getHoleName(i + 1, nHoles);
+        this.constraints.addConstraint(
+          createConstraint(
+            HolePositionObjectiveFunction.CONSTRAINT_CATEGORY,
+            `${priorName} to ${holeName} distance`,
+            ConstraintType.DIMENSIONAL
+          )
+        );
+      }
+    }
+
+    this.constraints.setNumberOfHoles(nHoles);
+    this.constraints.setObjectiveDisplayName("Hole position optimizer");
+    this.constraints.setObjectiveFunctionName(
+      "HolePositionFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    // Set default bounds
+    this.setDefaultBoundsFromTop();
+  }
+
+  /**
+   * Set default bounds based on current geometry.
+   */
+  private setDefaultBoundsFromTop(): void {
+    const currentGeometry = this.getGeometryPoint();
+
+    // Lower bounds
+    this.lowerBounds = currentGeometry.map((v, i) => {
+      if (i === 0) {
+        return Math.max(0.05, v * 0.5); // Bore length minimum 50mm
+      } else if (i === 1) {
+        return Math.max(0.1, v * 0.5); // Top hole ratio minimum 0.1
+      }
+      return Math.max(0.001, v * 0.5); // Spacings minimum 1mm
+    });
+
+    // Upper bounds
+    this.upperBounds = currentGeometry.map((v, i) => {
+      if (i === 1) {
+        return Math.min(0.9, v * 2.0); // Top hole ratio maximum 0.9
+      }
+      return v * 2.0;
+    });
+
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for bore diameters at existing bore points,
+ * optimizing from the top of the bore.
+ *
+ * Geometry dimensions:
+ * - For bore points from the top down, ratio of diameter at this bore point
+ *   to the next bore point below
+ *
+ * Use of diameter ratios rather than absolute diameters allows constraints
+ * to control the direction of taper:
+ * - Lower bound 1.0: bore flares out toward top
+ * - Upper bound 1.0: bore tapers inward toward top
+ *
+ * The bore points to vary can be specified as a number of bore points
+ * or with a bore point name. Diameters at bore points below are left unchanged.
+ *
+ * Ported from BoreDiameterFromTopObjectiveFunction.java
+ */
+export class BoreDiameterFromTopObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Bore diameter ratios";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONLESS;
+  static readonly DISPLAY_NAME = "Bore Diameter (from top) optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number | string
+  ) {
+    super(calculator, tuning, evaluator);
+
+    const nrBorePoints = calculator.getInstrument().borePoint.length;
+
+    // Determine number of dimensions
+    if (changedBorePoints === undefined) {
+      // Default: find lowest point with "Head" in name
+      this.nrDimensions = BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        calculator.getInstrument(),
+        "Head"
+      );
+    } else if (typeof changedBorePoints === "string") {
+      // Find by point name
+      this.nrDimensions = BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        calculator.getInstrument(),
+        changedBorePoints
+      );
+    } else {
+      // Use explicit count
+      this.nrDimensions = changedBorePoints;
+    }
+
+    // At least the bottom bore point is left unchanged
+    if (this.nrDimensions >= nrBorePoints) {
+      this.nrDimensions = nrBorePoints - 1;
+    }
+
+    // At least the top bore point is changed
+    if (this.nrDimensions < 1) {
+      this.nrDimensions = 1;
+    }
+
+    if (this.nrDimensions > 1) {
+      this.optimizerType = OptimizerType.BOBYQA;
+    } else {
+      this.optimizerType = OptimizerType.BRENT;
+    }
+
+    this.maxEvaluations = 10000;
+    this.setConstraints();
+  }
+
+  /**
+   * Find the index of the lowest bore point containing pointName.
+   * If not found, estimates based on hole positions.
+   */
+  static getLowestPoint(instrument: Instrument, pointName: string): number {
+    const borePoints = getSortedBorePoints(instrument);
+
+    if (borePoints.length <= 2) {
+      return 0;
+    }
+
+    // Look for lowest point by name (search from bottom up)
+    for (let i = borePoints.length - 1; i >= 0; i--) {
+      if (borePoints[i]!.name?.toLowerCase().includes(pointName.toLowerCase())) {
+        return i;
+      }
+    }
+
+    // Named point not found, estimate based on hole positions
+    const sortedHoles = getSortedHoles(instrument);
+    let topHolePosition: number;
+
+    if (sortedHoles.length > 0) {
+      topHolePosition = sortedHoles[0]!.position;
+    } else {
+      // No holes, use mid-point of bore
+      topHolePosition =
+        0.5 *
+        (borePoints[0]!.borePosition +
+          borePoints[borePoints.length - 1]!.borePosition);
+    }
+
+    // Find lowest bore point above the top tonehole
+    for (let i = borePoints.length - 2; i > 0; i--) {
+      if (borePoints[i]!.borePosition < topHolePosition) {
+        return i;
+      }
+    }
+
+    return 0;
+  }
+
+  /**
+   * Index of first point with static diameter, used as an initial
+   * reference for the remaining points.
+   */
+  private referencePointIdx(): number {
+    return this.nrDimensions;
+  }
+
+  getGeometryPoint(): number[] {
+    const geometry = new Array(this.nrDimensions);
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+    let nextBoreDia = sortedPoints[this.referencePointIdx()]!.boreDiameter;
+
+    // Process from bottom of affected region up to top
+    for (let dim = this.nrDimensions - 1; dim >= 0; dim--) {
+      if (nextBoreDia < 0.000001) {
+        nextBoreDia = 0.000001;
+      }
+      const borePoint = sortedPoints[dim]!;
+      geometry[dim] = borePoint.boreDiameter / nextBoreDia;
+      nextBoreDia = borePoint.boreDiameter;
+    }
+
+    return geometry;
+  }
+
+  setGeometryPoint(point: number[]): void {
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+    let nextBoreDia = sortedPoints[this.referencePointIdx()]!.boreDiameter;
+
+    // Process from bottom of affected region up to top
+    for (let dim = this.nrDimensions - 1; dim >= 0; dim--) {
+      const borePoint = sortedPoints[dim]!;
+      borePoint.boreDiameter = point[dim]! * nextBoreDia;
+      nextBoreDia = borePoint.boreDiameter;
+    }
+  }
+
+  protected setConstraints(): void {
+    for (let dim = 0; dim < this.nrDimensions; dim++) {
+      const name = `Ratio of diameters, bore point ${dim + 1} / bore point ${dim + 2}`;
+      this.constraints.addConstraint(
+        createConstraint(
+          BoreDiameterFromTopObjectiveFunction.CONSTRAINT_CATEGORY,
+          name,
+          BoreDiameterFromTopObjectiveFunction.CONSTRAINT_TYPE
+        )
+      );
+    }
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      BoreDiameterFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "BoreDiameterFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Default: allow ratios from 0.8 to 1.25 (20% change each way)
+    this.lowerBounds = new Array(this.nrDimensions).fill(0.8);
+    this.upperBounds = new Array(this.nrDimensions).fill(1.25);
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}

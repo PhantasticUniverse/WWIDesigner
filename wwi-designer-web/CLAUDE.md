@@ -94,7 +94,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **468 total tests**, all passing ✅
+- **480 total tests**, all passing ✅
 - **68+ parity tests** specifically for Java comparison
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
@@ -107,7 +107,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
 - [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
 - [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
-- [x] Phase 6: Optimization (DIRECT algorithm, 7 evaluators, 7 objective functions)
+- [x] Phase 6: Optimization (DIRECT algorithm, 7 evaluators, 9 objective functions)
 - [x] Phase 7: Web UI (Bun.serve, instrument/tuning editors, visualization, optimization)
 
 ### Recently Completed Features
@@ -135,19 +135,20 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 
 ### Remaining Features (~50% Remaining)
 
-#### Phase 10: Objective Functions (48 remaining from Java)
+#### Phase 10: Objective Functions (46 remaining from Java)
 Already implemented:
 - [x] LengthObjectiveFunction - Simple bore length optimization
 - [x] HolePositionObjectiveFunction - Optimize hole positions from bottom
+- [x] HolePositionFromTopObjectiveFunction - Optimize hole positions from top (ratio-based)
 - [x] HoleSizeObjectiveFunction - Optimize hole diameters
 - [x] HoleObjectiveFunction - Combined position + size optimization
 - [x] MergedObjectiveFunction - Abstract base for merging multiple objectives
 - [x] HoleGroupPositionObjectiveFunction - Grouped holes with equal spacing
 - [x] BoreDiameterFromBottomObjectiveFunction - Bore diameter ratios from bottom
+- [x] BoreDiameterFromTopObjectiveFunction - Bore diameter ratios from top
 
 Still needed:
-- [ ] HolePositionFromTopObjectiveFunction, HoleFromTopObjectiveFunction
-- [ ] BoreDiameterFromTopObjectiveFunction
+- [ ] HoleFromTopObjectiveFunction - Combined hole position/size from top
 - [ ] SingleTaperObjectiveFunction family (7 variants)
 - [ ] FippleFactorObjectiveFunction, WindowHeightObjectiveFunction
 - [ ] Combined objectives (HoleAndBoreObjectiveFunction, etc.)
@@ -176,7 +177,7 @@ Still needed:
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
 | Evaluators | 8 | 7 | 88% |
-| Objective Functions | 55 | 7 | 13% |
+| Objective Functions | 55 | 9 | 16% |
 | Tuners | 5 | 5 | 100% |
 | Spectrum Analyzers | 3 | 3 | 100% |
 | Study Models | 4 | 0 | 0% |
@@ -191,8 +192,8 @@ Still needed:
 5. ~~PlayingRangeSpectrum - Loop gain analysis~~ ✓
 6. ~~HoleGroupPositionObjectiveFunction - Grouped hole optimization~~ ✓
 7. ~~BoreDiameterFromBottomObjectiveFunction - Bore diameter optimization~~ ✓
-8. HolePositionFromTopObjectiveFunction - Top-based hole optimization
-9. BoreDiameterFromTopObjectiveFunction - Top-based bore optimization
+8. ~~HolePositionFromTopObjectiveFunction - Top-based hole optimization~~ ✓
+9. ~~BoreDiameterFromTopObjectiveFunction - Top-based bore optimization~~ ✓
 
 **Medium Priority (Extended Features):**
 10. ~~ImpedanceSpectrum - Analysis tool~~ ✓

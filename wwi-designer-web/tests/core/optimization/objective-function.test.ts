@@ -9,10 +9,12 @@ import { describe, test, expect } from "bun:test";
 import {
   LengthObjectiveFunction,
   HolePositionObjectiveFunction,
+  HolePositionFromTopObjectiveFunction,
   HoleSizeObjectiveFunction,
   HoleObjectiveFunction,
   HoleGroupPositionObjectiveFunction,
   BoreDiameterFromBottomObjectiveFunction,
+  BoreDiameterFromTopObjectiveFunction,
   BoreLengthAdjustmentType,
 } from "../../../src/core/optimization/hole-position-objective.ts";
 import { CentDeviationEvaluator } from "../../../src/core/optimization/evaluator.ts";
@@ -613,6 +615,264 @@ describe("Objective Functions", () => {
       const topIdx = BoreDiameterFromBottomObjectiveFunction.getTopOfBody(whistle);
       expect(topIdx).toBeGreaterThanOrEqual(0);
       expect(topIdx).toBeLessThan(whistle.borePoint.length);
+    });
+  });
+
+  describe("HolePositionFromTopObjectiveFunction", () => {
+    test("creates objective function", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HolePositionFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      expect(objective.getNrDimensions()).toBe(4); // bore + 3 holes
+    });
+
+    test("getGeometryPoint returns bore length and top hole ratio", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HolePositionFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+
+      expect(geometry.length).toBe(4);
+      // First dimension is bore length (0.3m)
+      expect(geometry[0]).toBeCloseTo(0.3, 4);
+      // Second dimension is top hole ratio (position 200 / bore 300 = 0.667)
+      // With mouthpiece at 0, realOrigin = 0, so ratio = 0.2 / 0.3 ≈ 0.667
+      expect(geometry[1]).toBeCloseTo(200 / 300, 3);
+    });
+
+    test("setGeometryPoint applies positions from top down", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HolePositionFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      // Get current geometry
+      const geometry = objective.getGeometryPoint();
+
+      // Apply same geometry (round-trip test)
+      objective.setGeometryPoint(geometry);
+
+      const instrument = calc.getInstrument();
+      const holes = instrument.hole;
+
+      // Holes should be at approximately the same positions
+      expect(holes[0]!.position).toBeCloseTo(0.2, 3); // 200mm in metres
+    });
+
+    test("top hole ratio is dimensionless in constraints", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HolePositionFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const constraints = objective.getConstraints();
+      const constraintList = constraints.getConstraints();
+
+      // First constraint is bore length (dimensional)
+      expect(constraintList[0]!.name).toBe("Bore length");
+      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+
+      // Second constraint is top hole ratio (dimensionless)
+      expect(constraintList[1]!.name).toContain("bore-length fraction");
+      expect(constraintList[1]!.type).toBe("DIMENSIONLESS");
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HolePositionFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("BoreDiameterFromTopObjectiveFunction", () => {
+    const createWhistleWithMoreBorePoints = (): Instrument => ({
+      name: "Test Whistle",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16 },
+        { borePosition: 100, boreDiameter: 15 },
+        { borePosition: 200, boreDiameter: 14 },
+        { borePosition: 300, boreDiameter: 13 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 15 },
+    });
+
+    test("creates bore diameter from top objective", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      // Optimize top 2 bore points
+      const objective = new BoreDiameterFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // 2 dimensions for top 2 points
+      expect(objective.getNrDimensions()).toBe(2);
+    });
+
+    test("getGeometryPoint returns diameter ratios from top down", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreDiameterFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const geometry = objective.getGeometryPoint();
+      expect(geometry.length).toBe(2);
+      // Point 0 (0.016) / Point 1 (0.015) ≈ 1.067 (ratio of point 0 to point 1)
+      // Point 1 (0.015) / Point 2 (0.014) ≈ 1.071 (ratio of point 1 to point 2)
+      expect(geometry[0]).toBeCloseTo(16 / 15, 3);
+      expect(geometry[1]).toBeCloseTo(15 / 14, 3);
+    });
+
+    test("setGeometryPoint modifies bore diameters from top down", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreDiameterFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      // Set ratios to 1.0 (cylindrical bore from reference point)
+      objective.setGeometryPoint([1.0, 1.0]);
+
+      const instrument = calc.getInstrument();
+      // Points 0 and 1 should equal Point 2 diameter (0.014m)
+      expect(instrument.borePoint[0]!.boreDiameter).toBeCloseTo(0.014, 4);
+      expect(instrument.borePoint[1]!.boreDiameter).toBeCloseTo(0.014, 4);
+    });
+
+    test("getLowestPoint finds named bore point", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+      // Add a named bore point
+      whistle.borePoint[1]!.name = "Head End";
+
+      const idx = BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        whistle,
+        "Head"
+      );
+      expect(idx).toBe(1);
+    });
+
+    test("getLowestPoint estimates when name not found", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+
+      // No named bore points, should estimate based on holes
+      const idx = BoreDiameterFromTopObjectiveFunction.getLowestPoint(
+        whistle,
+        "Head"
+      );
+      expect(idx).toBeGreaterThanOrEqual(0);
+      expect(idx).toBeLessThan(whistle.borePoint.length);
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreDiameterFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+
+    test("constraints are dimensionless", () => {
+      const whistle = createWhistleWithMoreBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new BoreDiameterFromTopObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        2
+      );
+
+      const constraints = objective.getConstraints();
+      const constraintList = constraints.getConstraints();
+
+      // All constraints should be dimensionless (ratios)
+      for (const constraint of constraintList) {
+        expect(constraint.type).toBe("DIMENSIONLESS");
+        expect(constraint.name).toContain("Ratio");
+      }
     });
   });
 });
