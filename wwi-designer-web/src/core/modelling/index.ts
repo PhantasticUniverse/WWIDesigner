@@ -12,6 +12,18 @@ export {
 } from "./instrument-calculator.ts";
 
 export {
+  type CalculatorType,
+  createCalculator,
+  createCalculatorForInstrument,
+  createNAFCalculator,
+  createWhistleCalculator,
+  createFluteCalculator,
+  createGenericCalculator,
+  detectCalculatorType,
+  isCompatible,
+} from "./calculator-factory.ts";
+
+export {
   PlayingRange,
   NoPlayingRange,
 } from "./playing-range.ts";

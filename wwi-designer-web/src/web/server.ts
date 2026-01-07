@@ -7,7 +7,10 @@
 
 import index from "./index.html";
 import { PhysicalParameters } from "../core/physics/physical-parameters.ts";
-import { DefaultInstrumentCalculator } from "../core/modelling/instrument-calculator.ts";
+import {
+  createCalculator,
+  type CalculatorType,
+} from "../core/modelling/calculator-factory.ts";
 import { InstrumentTuner } from "../core/modelling/instrument-tuner.ts";
 import { CentDeviationEvaluator } from "../core/optimization/evaluator.ts";
 import {
@@ -39,14 +42,21 @@ function getSession(id: string) {
 // API handlers
 async function handleCalculateTuning(req: Request): Promise<Response> {
   const body = await req.json();
-  const { instrument, tuning, temperature = 20, humidity = 45 } = body;
+  const {
+    instrument,
+    tuning,
+    temperature = 20,
+    humidity = 45,
+    calculatorType = "auto" as CalculatorType,
+  } = body;
 
   if (!instrument || !tuning) {
     return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
   }
 
   const params = new PhysicalParameters(temperature, "C", humidity);
-  const calc = new DefaultInstrumentCalculator(instrument, params);
+  // Use calculator factory with type detection or explicit type
+  const calc = createCalculator(instrument, params, calculatorType);
   const tuner = new InstrumentTuner(calc);
 
   const results = tuning.fingering.map((fingering: Fingering) => {
@@ -71,14 +81,22 @@ async function handleCalculateTuning(req: Request): Promise<Response> {
 
 async function handleOptimize(req: Request): Promise<Response> {
   const body = await req.json();
-  const { instrument, tuning, optimizationType = "positions", temperature = 20, humidity = 45 } = body;
+  const {
+    instrument,
+    tuning,
+    optimizationType = "positions",
+    temperature = 20,
+    humidity = 45,
+    calculatorType = "auto" as CalculatorType,
+  } = body;
 
   if (!instrument || !tuning) {
     return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
   }
 
   const params = new PhysicalParameters(temperature, "C", humidity);
-  const calc = new DefaultInstrumentCalculator(instrument, params);
+  // Use calculator factory with type detection or explicit type
+  const calc = createCalculator(instrument, params, calculatorType);
   const evaluator = new CentDeviationEvaluator(calc);
 
   let objective;
