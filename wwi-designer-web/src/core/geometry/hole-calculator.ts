@@ -75,14 +75,33 @@ export class DefaultHoleCalculator implements IHoleCalculator {
   /** Hole size multiplier for scaling */
   protected holeSizeMult: number;
 
+  /**
+   * Create a hole calculator.
+   *
+   * Note: Java has multiple constructor overloads with different defaults:
+   * - DefaultHoleCalculator() uses DEFAULT_FINGER_ADJ (0.01)
+   * - DefaultHoleCalculator(holeSizeMult) uses NO_FINGER_ADJ (0.0)
+   * - DefaultHoleCalculator(isPlugged, fingerAdj) uses DEFAULT_HOLE_SIZE_MULT
+   *
+   * When holeSizeMult is provided (non-default), fingerAdjustment defaults to 0.0
+   * to match Java's behavior for NAFCalculator.
+   */
   constructor(
     holeSizeMult: number = DEFAULT_HOLE_SIZE_MULT,
     isPlugged: boolean = false,
-    fingerAdjustment: number = DEFAULT_FINGER_ADJ
+    fingerAdjustment?: number
   ) {
     this.holeSizeMult = holeSizeMult;
     this.isPlugged = isPlugged;
-    this.fingerAdjustment = fingerAdjustment;
+    // Match Java: when holeSizeMult is explicitly provided, use NO_FINGER_ADJ
+    // When using defaults, use DEFAULT_FINGER_ADJ
+    if (fingerAdjustment !== undefined) {
+      this.fingerAdjustment = fingerAdjustment;
+    } else if (holeSizeMult !== DEFAULT_HOLE_SIZE_MULT) {
+      this.fingerAdjustment = NO_FINGER_ADJ;
+    } else {
+      this.fingerAdjustment = DEFAULT_FINGER_ADJ;
+    }
   }
 
   getFingerAdjustment(): number {
