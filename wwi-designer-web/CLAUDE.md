@@ -94,7 +94,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **442 total tests**, all passing ✅
+- **452 total tests**, all passing ✅
 - **68+ parity tests** specifically for Java comparison
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
@@ -107,7 +107,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
 - [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
 - [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
-- [x] Phase 6: Optimization (DIRECT algorithm, 2 evaluators, basic objective function)
+- [x] Phase 6: Optimization (DIRECT algorithm, 7 evaluators, 3 objective functions)
 - [x] Phase 7: Web UI (Bun.serve, instrument/tuning editors, visualization, optimization)
 
 ### Recently Completed Features
@@ -133,16 +133,21 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] LinearVInstrumentTuner - Velocity-based linear tuner
 - [x] LinearXInstrumentTuner - Reactance-based linear tuner
 
-### Remaining Features (~60% Remaining)
+### Remaining Features (~50% Remaining)
 
-#### Phase 10: Objective Functions (53 missing from Java)
-- [ ] Hole position objectives (HolePositionFromTopObjectiveFunction, etc.)
-- [ ] Hole size objectives (HoleSizeObjectiveFunction, etc.)
-- [ ] Bore objectives (BoreDiameterObjectiveFunction, BoreLengthObjectiveFunction)
-- [ ] Taper objectives (TaperRatioObjectiveFunction, etc.)
-- [ ] Mouthpiece objectives (FippleFactorObjectiveFunction, etc.)
+#### Phase 10: Objective Functions (52 remaining from Java)
+Already implemented:
+- [x] HolePositionObjectiveFunction - Optimize hole positions from bottom
+- [x] HoleSizeObjectiveFunction - Optimize hole diameters
+- [x] HoleObjectiveFunction - Combined position + size optimization
+
+Still needed:
+- [ ] HolePositionFromTopObjectiveFunction, HoleFromTopObjectiveFunction
+- [ ] HoleGroupObjectiveFunction, HoleGroupPositionObjectiveFunction
+- [ ] BoreDiameterObjectiveFunction, BoreLengthObjectiveFunction
+- [ ] SingleTaperObjectiveFunction family (7 variants)
+- [ ] FippleFactorObjectiveFunction, WindowHeightObjectiveFunction
 - [ ] Combined objectives (HoleAndBoreObjectiveFunction, etc.)
-- [ ] Grouped hole objectives (HoleGroupObjectiveFunction)
 
 #### Phase 12: Study Framework
 - [ ] BaseStudyModel abstraction
@@ -178,18 +183,21 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 **High Priority (Core Functionality):**
 1. ~~Mouthpiece visualization - Quick win, visual parity~~ ✓
 2. ~~FminEvaluator, FmaxEvaluator - Required for many objective functions~~ ✓
-3. HoleGroupObjectiveFunction - Common optimization use case
-4. BoreDiameterObjectiveFunction - Bore optimization
+3. ~~BellNoteEvaluator, ReflectionEvaluator - Additional optimization evaluators~~ ✓
+4. ~~LinearXInstrumentTuner - Reactance-based tuning~~ ✓
+5. ~~PlayingRangeSpectrum - Loop gain analysis~~ ✓
+6. HoleGroupObjectiveFunction - Common optimization use case
+7. BoreDiameterObjectiveFunction - Bore optimization
 
 **Medium Priority (Extended Features):**
-5. ~~ImpedanceSpectrum - Analysis tool~~ ✓
-6. ~~ReflectanceSpectrum - Analysis tool~~ ✓
-7. Remaining hole objectives (10+ functions)
-8. Bore/taper objectives (5+ functions)
+8. ~~ImpedanceSpectrum - Analysis tool~~ ✓
+9. ~~ReflectanceSpectrum - Analysis tool~~ ✓
+10. Remaining hole objectives (10+ functions)
+11. Bore/taper objectives (5+ functions)
 
 **Lower Priority (Specialized):**
-9. Study framework - Application-specific workflows
-10. Specialized evaluators (Bell, Whistle)
+12. Study framework - Application-specific workflows
+13. WhistleEvaluator (requires WhistleCalculator)
 
 ## Running the Web Application
 
