@@ -51,10 +51,13 @@ export {
   HolePositionFromTopObjectiveFunction,
   HoleSizeObjectiveFunction,
   HoleObjectiveFunction,
+  HoleFromTopObjectiveFunction,
   MergedObjectiveFunction,
   HoleGroupPositionObjectiveFunction,
   BoreDiameterFromBottomObjectiveFunction,
   BoreDiameterFromTopObjectiveFunction,
+  BasicTaperObjectiveFunction,
+  SingleTaperRatioObjectiveFunction,
   BoreLengthAdjustmentType,
 } from "./hole-position-objective.ts";
 

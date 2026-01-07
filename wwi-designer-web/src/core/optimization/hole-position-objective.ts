@@ -1643,3 +1643,388 @@ export class BoreDiameterFromTopObjectiveFunction extends BaseObjectiveFunction 
     this.constraints.setUpperBounds(this.upperBounds);
   }
 }
+
+/**
+ * Objective function for hole positions and diameters, with
+ * the top hole position expressed as a fraction of bore length.
+ *
+ * Combines:
+ * - HolePositionFromTopObjectiveFunction: bore length + hole positions from top
+ * - HoleSizeObjectiveFunction: hole diameters
+ *
+ * Ported from HoleFromTopObjectiveFunction.java
+ */
+export class HoleFromTopObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Hole size & position";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator);
+
+    // Create component objective functions
+    this.components = [
+      new HolePositionFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        lengthAdjustmentMode
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      HoleFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("HoleFromTopObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+/**
+ * Objective function for a simple two-section tapered bore.
+ * The bore has two sections. The diameter at the head, and diameter between
+ * the two sections are left invariant.
+ *
+ * Geometry dimensions:
+ * - Length of head section, as a fraction of total bore length (dimensionless)
+ * - Taper ratio: foot diameter / middle diameter (dimensionless)
+ *
+ * Ported from BasicTaperObjectiveFunction.java
+ */
+export class BasicTaperObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Simple taper";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONLESS;
+  static readonly DISPLAY_NAME = "Basic Taper optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 2;
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const geometry = new Array(this.nrDimensions);
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+
+    // Assume at least two points, taper to be optimized starts on the second,
+    // and ends on the last. (bottomPoint and middlePoint may be the same point.)
+    const topPoint = sortedPoints[0]!;
+    const middlePoint = sortedPoints[1]!;
+    const bottomPoint = sortedPoints[sortedPoints.length - 1]!;
+
+    // Head length ratio
+    geometry[0] =
+      (middlePoint.borePosition - topPoint.borePosition) /
+      (bottomPoint.borePosition - topPoint.borePosition);
+
+    // Foot diameter ratio
+    geometry[1] = bottomPoint.boreDiameter / middlePoint.boreDiameter;
+
+    return geometry;
+  }
+
+  setGeometryPoint(point: number[]): void {
+    const instrument = this.calculator.getInstrument();
+    const sortedPoints = getSortedBorePoints(instrument);
+
+    const topPoint = sortedPoints[0]!;
+    const middlePoint = sortedPoints[1]!;
+    const bottomPoint = sortedPoints[sortedPoints.length - 1]!;
+    const boreLength = bottomPoint.borePosition - topPoint.borePosition;
+
+    // First point doesn't change at all
+    // Second point changes position, but not diameter
+    middlePoint.borePosition = boreLength * point[0]! + topPoint.borePosition;
+
+    // Bottom point changes diameter, but not position
+    // Create new point in case bottomPoint was identical to middlePoint
+    const newBottomDiameter = middlePoint.boreDiameter * point[1]!;
+
+    // Replace bore points with exactly 3 points
+    instrument.borePoint = [
+      { ...topPoint },
+      { ...middlePoint },
+      {
+        borePosition: boreLength + topPoint.borePosition,
+        boreDiameter: newBottomDiameter,
+        name: bottomPoint.name,
+      },
+    ];
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        BasicTaperObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Head length ratio (to bore length)",
+        BasicTaperObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        BasicTaperObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Foot diameter ratio (foot/middle)",
+        BasicTaperObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      BasicTaperObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("BasicTaperObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Head length ratio: 0.1 to 0.9
+    // Foot diameter ratio: 0.8 to 1.25
+    this.lowerBounds = [0.1, 0.8];
+    this.upperBounds = [0.9, 1.25];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for a simple three-section bore with a single tapered section.
+ * The foot diameter remains invariant. The position of the top and bottom bore
+ * points remain unchanged.
+ *
+ * Geometry dimensions:
+ * - Taper ratio: head diameter / foot diameter (dimensionless)
+ * - Fraction of bore that is tapered (dimensionless)
+ * - Fraction of untapered length at head end (dimensionless)
+ *
+ * Ported from SingleTaperRatioObjectiveFunction.java
+ */
+export class SingleTaperRatioObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Single bore taper";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONLESS;
+  static readonly DISPLAY_NAME = "Single taper (dimensionless) optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    setStartingGeometry: boolean = true
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 3;
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.setConstraints();
+
+    if (setStartingGeometry) {
+      this.setStartingGeometry();
+    }
+  }
+
+  getGeometryPoint(): number[] {
+    const geometry = new Array(this.nrDimensions);
+    const sortedPoints = getSortedBorePoints(this.calculator.getInstrument());
+
+    // Assume at least two points
+    const topPoint = sortedPoints[0]!;
+    const nextPoint = sortedPoints[1]!;
+    const penultimatePoint = sortedPoints[sortedPoints.length - 2]!;
+    const bottomPoint = sortedPoints[sortedPoints.length - 1]!;
+    const boreLength = bottomPoint.borePosition - topPoint.borePosition;
+
+    let taperStart: number;
+    let taperEnd: number;
+
+    // Taper ratio: head diameter / foot diameter
+    geometry[0] = topPoint.boreDiameter / bottomPoint.boreDiameter;
+
+    if (topPoint.boreDiameter === bottomPoint.boreDiameter) {
+      // Bore doesn't really taper
+      taperStart = topPoint.borePosition;
+      taperEnd = bottomPoint.borePosition;
+    } else {
+      if (topPoint.boreDiameter === nextPoint.boreDiameter) {
+        // Taper starts on second point
+        taperStart = nextPoint.borePosition;
+      } else {
+        // Taper starts on first point
+        taperStart = topPoint.borePosition;
+      }
+
+      if (bottomPoint.boreDiameter === penultimatePoint.boreDiameter) {
+        // Taper ends on second-last point
+        taperEnd = penultimatePoint.borePosition;
+      } else {
+        // Taper ends on bottom point
+        taperEnd = bottomPoint.borePosition;
+      }
+    }
+
+    if (taperEnd - taperStart >= boreLength) {
+      geometry[1] = 1.0;
+      geometry[2] = 0.0;
+    } else {
+      geometry[1] = (taperEnd - taperStart) / boreLength;
+      geometry[2] =
+        (taperStart - topPoint.borePosition) /
+        (boreLength - (taperEnd - taperStart));
+    }
+
+    return geometry;
+  }
+
+  setGeometryPoint(point: number[]): void {
+    const instrument = this.calculator.getInstrument();
+    const sortedPoints = getSortedBorePoints(instrument);
+
+    const topPoint = sortedPoints[0]!;
+    const bottomPoint = sortedPoints[sortedPoints.length - 1]!;
+    const footDiameter = bottomPoint.boreDiameter;
+    const headDiameter = footDiameter * point[0]!;
+    const boreLength = bottomPoint.borePosition - topPoint.borePosition;
+    const taperLength = boreLength * point[1]!;
+    const taperStart = (boreLength - taperLength) * point[2]!;
+
+    // Replace existing bore points with a new list of up to 4 points
+    const newBorePoints: typeof instrument.borePoint = [];
+
+    // First point: head
+    newBorePoints.push({
+      borePosition: topPoint.borePosition,
+      boreDiameter: headDiameter,
+      name: topPoint.name,
+    });
+
+    if (taperStart > 0) {
+      // Taper begins on second point rather than first
+      newBorePoints.push({
+        borePosition: topPoint.borePosition + taperStart,
+        boreDiameter: headDiameter,
+      });
+    }
+
+    // Add point for end of taper
+    newBorePoints.push({
+      borePosition: topPoint.borePosition + taperStart + taperLength,
+      boreDiameter: footDiameter,
+    });
+
+    if (taperStart + taperLength < boreLength) {
+      // Taper ends on second-last point rather than last
+      newBorePoints.push({
+        borePosition: topPoint.borePosition + boreLength,
+        boreDiameter: footDiameter,
+        name: bottomPoint.name,
+      });
+    }
+
+    instrument.borePoint = newBorePoints;
+  }
+
+  /**
+   * Reset the instrument borePoints to a reasonable starting geometry.
+   * Creates 4 bore points with a slight taper in the middle third.
+   */
+  setStartingGeometry(): void {
+    const instrument = this.calculator.getInstrument();
+    const sortedPoints = getSortedBorePoints(instrument);
+
+    const head = sortedPoints[0]!;
+    const tail = sortedPoints[sortedPoints.length - 1]!;
+
+    const startPosition = head.borePosition;
+    const boreLength = tail.borePosition - startPosition;
+    const tailDiameter = tail.boreDiameter;
+    const headDiameter = tailDiameter * 1.05;
+
+    instrument.borePoint = [
+      {
+        borePosition: startPosition,
+        boreDiameter: headDiameter,
+        name: head.name,
+      },
+      {
+        borePosition: boreLength / 3 + startPosition,
+        boreDiameter: headDiameter,
+      },
+      {
+        borePosition: (2 * boreLength) / 3 + startPosition,
+        boreDiameter: tailDiameter,
+      },
+      {
+        borePosition: tail.borePosition,
+        boreDiameter: tailDiameter,
+        name: tail.name,
+      },
+    ];
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Bore diameter ratio (top/bottom)",
+        SingleTaperRatioObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Taper length ratio to bore length",
+        SingleTaperRatioObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Untapered top length ratio to total untapered length",
+        SingleTaperRatioObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperRatioObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperRatioObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Taper ratio (head/foot): 0.9 to 1.2
+    // Taper length ratio: 0.1 to 1.0
+    // Untapered top ratio: 0.0 to 1.0
+    this.lowerBounds = [0.9, 0.1, 0.0];
+    this.upperBounds = [1.2, 1.0, 1.0];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
