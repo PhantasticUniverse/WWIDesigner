@@ -2028,3 +2028,239 @@ export class SingleTaperRatioObjectiveFunction extends BaseObjectiveFunction {
     this.constraints.setUpperBounds(this.upperBounds);
   }
 }
+
+/**
+ * Get a tuning containing only the lowest frequency note from the original tuning.
+ * Used by FippleFactorObjectiveFunction to calibrate the fipple using the fundamental.
+ */
+function getLowestNoteTuning(tuning: Tuning): Tuning {
+  let lowestFingering: typeof tuning.fingering[0] | null = null;
+  let lowestFrequency = Number.POSITIVE_INFINITY;
+
+  for (const fingering of tuning.fingering) {
+    const note = fingering.note;
+    if (note?.frequency !== undefined && note.frequency < lowestFrequency) {
+      lowestFrequency = note.frequency;
+      lowestFingering = fingering;
+    }
+  }
+
+  return {
+    name: tuning.name,
+    comment: tuning.comment,
+    numberOfHoles: tuning.numberOfHoles,
+    fingering: lowestFingering ? [lowestFingering] : [],
+  };
+}
+
+/**
+ * Objective function for calibrating an instrument's fipple factor.
+ * If the Tuning has more than one note, only the one with the lowest
+ * frequency is used to determine the fipple factor.
+ *
+ * Single dimension optimization using Brent optimizer.
+ *
+ * Ported from FippleFactorObjectiveFunction.java
+ */
+export class FippleFactorObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece fipple";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONLESS;
+  static readonly DISPLAY_NAME = "Fipple factor";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    // Use only the lowest note from the tuning
+    super(calculator, getLowestNoteTuning(tuning), evaluator);
+    this.nrDimensions = 1;
+    this.optimizerType = OptimizerType.BRENT;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const fipple = this.calculator.getInstrument().mouthpiece?.fipple;
+    const fippleFactor = fipple?.fippleFactor ?? 1.0;
+    return [fippleFactor];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    if (instrument.mouthpiece?.fipple) {
+      instrument.mouthpiece.fipple.fippleFactor = point[0]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        FippleFactorObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Fipple factor",
+        FippleFactorObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      FippleFactorObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("FippleFactorObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Fipple factor typically ranges from 0.5 to 2.0
+    this.lowerBounds = [0.5];
+    this.upperBounds = [2.0];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+/**
+ * Objective function for calibrating the height of a fipple flute's window
+ * or a transverse flute's embouchure hole.
+ *
+ * Single dimension optimization using Brent optimizer.
+ *
+ * Ported from WindowHeightObjectiveFunction.java
+ */
+export class WindowHeightObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece window";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONAL;
+  static readonly DISPLAY_NAME = "Window Height calibrator";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 1;
+    this.optimizerType = OptimizerType.BRENT;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const mouthpiece = this.calculator.getInstrument().mouthpiece;
+
+    if (mouthpiece?.fipple) {
+      return [mouthpiece.fipple.windowHeight ?? 0];
+    } else if (mouthpiece?.embouchureHole) {
+      return [mouthpiece.embouchureHole.height];
+    }
+
+    return [0];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const mouthpiece = instrument.mouthpiece;
+
+    if (mouthpiece?.fipple) {
+      mouthpiece.fipple.windowHeight = point[0]!;
+    } else if (mouthpiece?.embouchureHole) {
+      mouthpiece.embouchureHole.height = point[0]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        WindowHeightObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Window height",
+        WindowHeightObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      WindowHeightObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("WindowHeightObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentHeight = this.getGeometryPoint()[0]!;
+
+    // Window height typically ranges from 1mm to 10mm (0.001m to 0.01m)
+    this.lowerBounds = [Math.max(0.001, currentHeight * 0.5)];
+    this.upperBounds = [Math.min(0.02, currentHeight * 2.0)];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for hole positions and diameters,
+ * and a two-section bore with taper.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - BasicTaperObjectiveFunction: head length ratio + foot diameter ratio
+ *
+ * Ported from HoleAndTaperObjectiveFunction.java
+ */
+export class HoleAndTaperObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Hole and taper optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+
+    // Create component objective functions
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.MOVE_BOTTOM
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new BasicTaperObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 20000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndTaperObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("HoleAndTaperObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+  }
+}

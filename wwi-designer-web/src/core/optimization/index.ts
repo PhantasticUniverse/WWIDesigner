@@ -58,6 +58,9 @@ export {
   BoreDiameterFromTopObjectiveFunction,
   BasicTaperObjectiveFunction,
   SingleTaperRatioObjectiveFunction,
+  FippleFactorObjectiveFunction,
+  WindowHeightObjectiveFunction,
+  HoleAndTaperObjectiveFunction,
   BoreLengthAdjustmentType,
 } from "./hole-position-objective.ts";
 
