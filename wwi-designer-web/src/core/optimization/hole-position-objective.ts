@@ -2264,3 +2264,521 @@ export class HoleAndTaperObjectiveFunction extends MergedObjectiveFunction {
     this.constraints.setConstraintsName("Default");
   }
 }
+
+/**
+ * Objective function for optimizing an instrument's beta factor.
+ * Beta is the jet amplification factor in the mouthpiece model.
+ *
+ * Single dimension optimization using Brent optimizer.
+ *
+ * Ported from BetaObjectiveFunction.java
+ */
+export class BetaObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece beta";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONLESS;
+  static readonly DISPLAY_NAME = "Beta calibrator";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 1;
+    this.optimizerType = OptimizerType.BRENT;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const beta = this.calculator.getInstrument().mouthpiece?.beta ?? 0.35;
+    return [beta];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    if (instrument.mouthpiece) {
+      instrument.mouthpiece.beta = point[0]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        BetaObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Beta",
+        BetaObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      BetaObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("BetaObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Beta typically ranges from 0.2 to 0.6
+    this.lowerBounds = [0.2];
+    this.upperBounds = [0.6];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for the length of the airstream
+ * in a fipple or transverse flute.
+ *
+ * For fipple mouthpiece: optimizes windowLength
+ * For embouchure hole: optimizes airstreamLength
+ *
+ * Single dimension optimization using Brent optimizer.
+ *
+ * Ported from AirstreamLengthObjectiveFunction.java
+ */
+export class AirstreamLengthObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece window";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONAL;
+  static readonly DISPLAY_NAME = "Airstream Length calibrator";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 1;
+    this.optimizerType = OptimizerType.BRENT;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const mouthpiece = this.calculator.getInstrument().mouthpiece;
+
+    if (mouthpiece?.fipple) {
+      return [mouthpiece.fipple.windowLength];
+    } else if (mouthpiece?.embouchureHole) {
+      return [mouthpiece.embouchureHole.airstreamLength];
+    }
+
+    return [0];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const mouthpiece = instrument.mouthpiece;
+
+    if (mouthpiece?.fipple) {
+      mouthpiece.fipple.windowLength = point[0]!;
+    } else if (mouthpiece?.embouchureHole) {
+      mouthpiece.embouchureHole.airstreamLength = point[0]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        AirstreamLengthObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Airstream length",
+        AirstreamLengthObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      AirstreamLengthObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "AirstreamLengthObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentLength = this.getGeometryPoint()[0]!;
+
+    // Airstream length typically ranges from 3mm to 15mm (0.003m to 0.015m)
+    this.lowerBounds = [Math.max(0.003, currentLength * 0.5)];
+    this.upperBounds = [Math.min(0.02, currentLength * 2.0)];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for NAF (Native American Flute) hole sizes.
+ * Extends HoleSizeObjectiveFunction with custom trust region parameters.
+ *
+ * Ported from NafHoleSizeObjectiveFunction.java
+ */
+export class NafHoleSizeObjectiveFunction extends HoleSizeObjectiveFunction {
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.constraints.setObjectiveFunctionName("NafHoleSizeObjectiveFunction");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+/**
+ * Objective function for bore length and hole positions, with
+ * holes equally spaced within groups and top hole position as a
+ * fraction of bore length.
+ *
+ * Extends HoleGroupPositionObjectiveFunction with top-hole ratio logic.
+ *
+ * Ported from HoleGroupPositionFromTopObjectiveFunction.java
+ */
+export class HoleGroupPositionFromTopObjectiveFunction extends HoleGroupPositionObjectiveFunction {
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    holeGroups: number[][],
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator, holeGroups, lengthAdjustmentMode);
+    // Re-set constraints to use the overridden version
+    this.setConstraintsFromTop();
+  }
+
+  /**
+   * Get the position of the farthest bore point (end of bore).
+   */
+  private getEndOfBorePosition(): number {
+    const borePoints = this.calculator.getInstrument().borePoint;
+    let endPosition = borePoints[0]?.borePosition ?? 0;
+    for (const bp of borePoints) {
+      if (bp.borePosition > endPosition) {
+        endPosition = bp.borePosition;
+      }
+    }
+    return endPosition;
+  }
+
+  override getGeometryPoint(): number[] {
+    const sortedHoles = getSortedHoles(this.calculator.getInstrument());
+    const holeGroups = this.getHoleGroups();
+    const nrDims = this.getNrDimensions();
+
+    const geometry = new Array(nrDims).fill(0);
+
+    // First dimension is bore length
+    geometry[0] = this.getEndOfBorePosition();
+
+    if (nrDims > 1 && sortedHoles.length > 0) {
+      // Second dimension is top hole ratio
+      geometry[1] = this.getTopRatio(geometry[0], sortedHoles[0]!.position);
+
+      // Remaining dimensions are spacings, averaged within groups
+      let priorPosition = sortedHoles[0]!.position;
+      const dimensionByHole = this.getDimensionByHole();
+      const groupSize = this.getGroupSize();
+
+      for (let i = 1; i < sortedHoles.length; i++) {
+        const hole = sortedHoles[i]!;
+        // dimensionByHole[i-1] gives the dimension for spacing after hole i-1
+        // We add 1 because dimensions 0 and 1 are bore length and top ratio
+        geometry[dimensionByHole[i - 1]! + 1] +=
+          (hole.position - priorPosition) / groupSize[i - 1]!;
+        priorPosition = hole.position;
+      }
+    }
+
+    return geometry;
+  }
+
+  override setGeometryPoint(point: number[]): void {
+    // First, set bore length via parent
+    const sortedHoles = getSortedHoles(this.calculator.getInstrument());
+
+    if (sortedHoles.length === 0) {
+      return;
+    }
+
+    // Convert geometry to hole positions
+    const dimensionByHole = this.getDimensionByHole();
+
+    // First hole position from top ratio
+    const topHolePosition = this.getTopPosition(point[0]!, point[1]!);
+    sortedHoles[0]!.position = topHolePosition;
+
+    // Remaining holes from spacings
+    let priorPosition = topHolePosition;
+    for (let i = 1; i < sortedHoles.length; i++) {
+      const spacing = point[dimensionByHole[i - 1]! + 1]!;
+      sortedHoles[i]!.position = priorPosition + spacing;
+      priorPosition = sortedHoles[i]!.position;
+    }
+  }
+
+  /**
+   * Calculate top hole position as a ratio to bore length.
+   * Both measured from mouthpiece position.
+   */
+  private getTopRatio(boreLength: number, topHolePosition: number): number {
+    const realOrigin =
+      this.calculator.getInstrument().mouthpiece?.position ?? 0;
+    return (topHolePosition - realOrigin) / (boreLength - realOrigin);
+  }
+
+  /**
+   * Convert top hole ratio back to absolute position.
+   */
+  private getTopPosition(boreLength: number, topHoleRatio: number): number {
+    const realOrigin =
+      this.calculator.getInstrument().mouthpiece?.position ?? 0;
+    const boreLengthFromEdge = boreLength - realOrigin;
+    return topHoleRatio * boreLengthFromEdge + realOrigin;
+  }
+
+  /**
+   * Get the dimension-by-hole mapping from parent.
+   */
+  private getDimensionByHole(): number[] {
+    // This mirrors the parent's dimensionByHole computation
+    const holeGroups = this.getHoleGroups();
+    const numberOfHoles = this.calculator.getInstrument().hole.length;
+    const dimensionByHole = new Array(numberOfHoles).fill(0);
+
+    let dimension = 1; // Start at 1 because 0 is bore length, 1 is top ratio
+
+    for (const group of holeGroups) {
+      if (group.length > 1) {
+        for (let j = 0; j < group.length - 1; j++) {
+          dimensionByHole[group[j]!] = dimension;
+        }
+        dimension++;
+      }
+      if (group.length > 0) {
+        dimensionByHole[group[group.length - 1]!] = dimension;
+        dimension++;
+      }
+    }
+
+    return dimensionByHole;
+  }
+
+  /**
+   * Get the group size mapping from parent.
+   */
+  private getGroupSize(): number[] {
+    const holeGroups = this.getHoleGroups();
+    const numberOfHoles = this.calculator.getInstrument().hole.length;
+    const groupSize = new Array(numberOfHoles).fill(1);
+
+    for (const group of holeGroups) {
+      if (group.length > 1) {
+        for (let j = 0; j < group.length - 1; j++) {
+          groupSize[group[j]!] = group.length - 1;
+        }
+      }
+    }
+
+    return groupSize;
+  }
+
+  /**
+   * Set up constraints with top-hole ratio as dimensionless.
+   */
+  private setConstraintsFromTop(): void {
+    const sortedHoles = getSortedHoles(this.calculator.getInstrument());
+    const nHoles = sortedHoles.length;
+    const holeGroups = this.getHoleGroups();
+
+    // Clear and rebuild constraints
+    this.constraints.clearConstraints(
+      HoleGroupPositionObjectiveFunction.CONSTRAINT_CATEGORY
+    );
+
+    // Bore length constraint
+    this.constraints.addConstraint(
+      createConstraint(
+        HoleGroupPositionObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Bore length",
+        ConstraintType.DIMENSIONAL
+      )
+    );
+
+    if (holeGroups.length > 0) {
+      // Top hole ratio (dimensionless)
+      this.constraints.addConstraint(
+        createConstraint(
+          HoleGroupPositionObjectiveFunction.CONSTRAINT_CATEGORY,
+          "Ratio, from splitting edge, of top-hole position to bore length",
+          ConstraintType.DIMENSIONLESS
+        )
+      );
+
+      // Group spacings and between-group spacings
+      for (let groupIdx = 0; groupIdx < holeGroups.length; groupIdx++) {
+        const group = holeGroups[groupIdx]!;
+        const isGroup = group.length > 1;
+
+        if (isGroup) {
+          this.constraints.addConstraint(
+            createConstraint(
+              HoleGroupPositionObjectiveFunction.CONSTRAINT_CATEGORY,
+              `Group ${groupIdx + 1} spacing`,
+              ConstraintType.DIMENSIONAL
+            )
+          );
+        }
+
+        if (groupIdx + 1 < holeGroups.length) {
+          this.constraints.addConstraint(
+            createConstraint(
+              HoleGroupPositionObjectiveFunction.CONSTRAINT_CATEGORY,
+              `Group ${groupIdx + 1} to Group ${groupIdx + 2} distance`,
+              ConstraintType.DIMENSIONAL
+            )
+          );
+        }
+      }
+    }
+
+    this.constraints.setNumberOfHoles(nHoles);
+    this.constraints.setObjectiveDisplayName("Grouped hole-spacing optimizer");
+    this.constraints.setObjectiveFunctionName(
+      "HoleGroupPositionFromTopObjectiveFunction"
+    );
+    this.constraints.setHoleGroups(holeGroups);
+  }
+}
+
+/**
+ * Objective function for grouped-hole position and size optimization.
+ *
+ * Combines:
+ * - HoleGroupPositionFromTopObjectiveFunction: grouped hole positions from top
+ * - HoleSizeObjectiveFunction: hole diameters
+ *
+ * Ported from HoleGroupFromTopObjectiveFunction.java
+ */
+export class HoleGroupFromTopObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME = "Grouped-hole position & size";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    holeGroups: number[][],
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HoleGroupPositionFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        holeGroups,
+        lengthAdjustmentMode
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      HoleGroupFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleGroupFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+
+  override getInitialTrustRegionRadius(): number {
+    return 10.0;
+  }
+
+  override getStoppingTrustRegionRadius(): number {
+    return 1e-8;
+  }
+}
+
+/**
+ * Objective function for hole positions and diameters, plus
+ * bore point diameters from the top.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - BoreDiameterFromTopObjectiveFunction: bore diameter ratios from top
+ *
+ * Ported from HoleAndBoreDiameterFromTopObjectiveFunction.java
+ */
+export class HoleAndBoreDiameterFromTopObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME =
+    "Hole, plus bore-point diameter from top, optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    changedBorePoints?: number | string
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.PRESERVE_TAPER
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new BoreDiameterFromTopObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        changedBorePoints
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 50000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndBoreDiameterFromTopObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndBoreDiameterFromTopObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+}

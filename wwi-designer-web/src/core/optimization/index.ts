@@ -54,6 +54,8 @@ export {
   HoleFromTopObjectiveFunction,
   MergedObjectiveFunction,
   HoleGroupPositionObjectiveFunction,
+  HoleGroupPositionFromTopObjectiveFunction,
+  HoleGroupFromTopObjectiveFunction,
   BoreDiameterFromBottomObjectiveFunction,
   BoreDiameterFromTopObjectiveFunction,
   BasicTaperObjectiveFunction,
@@ -61,6 +63,10 @@ export {
   FippleFactorObjectiveFunction,
   WindowHeightObjectiveFunction,
   HoleAndTaperObjectiveFunction,
+  HoleAndBoreDiameterFromTopObjectiveFunction,
+  BetaObjectiveFunction,
+  AirstreamLengthObjectiveFunction,
+  NafHoleSizeObjectiveFunction,
   BoreLengthAdjustmentType,
 } from "./hole-position-objective.ts";
 
