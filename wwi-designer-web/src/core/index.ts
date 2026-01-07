@@ -10,3 +10,9 @@ export * from "./constants.ts";
 
 // Math module (complex numbers, transfer matrices, state vectors)
 export * from "./math/index.ts";
+
+// Physics module (air properties)
+export * from "./physics/index.ts";
+
+// Geometry calculators (bore sections, tubes)
+export * from "./geometry/index.ts";
