@@ -267,12 +267,21 @@ export class DefaultInstrumentCalculator implements IInstrumentCalculator {
     // Sort by position
     positions.sort((a, b) => a.position - b.position);
 
-    // Walk through positions creating sections and inserting holes
-    let currentPosition = positions.length > 0 ? positions[0]!.position : 0;
-    let currentDiameter =
-      sortedBorePoints.length > 0 ? sortedBorePoints[0]!.boreDiameter : 0.01;
+    // Java starts components from the mouthpiece position, not from the first bore point.
+    // Bore sections before the mouthpiece are handled separately in the mouthpiece headspace.
+    const mouthpiecePosition = this.instrument.mouthpiece.position;
+
+    // Find starting position and diameter at mouthpiece
+    let currentPosition = mouthpiecePosition;
+    let currentDiameter = this.instrument.mouthpiece.boreDiameter ??
+      (sortedBorePoints.length > 0 ? sortedBorePoints[0]!.boreDiameter : 0.01);
 
     for (const item of positions) {
+      // Skip positions at or before mouthpiece (those are handled in headspace)
+      if (item.position <= mouthpiecePosition) {
+        continue;
+      }
+
       if (item.type === "hole") {
         // Create bore section from current position to hole
         const hole = sortedHoles[item.index]!;
