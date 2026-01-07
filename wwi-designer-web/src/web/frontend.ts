@@ -255,8 +255,8 @@ function renderMouthpieceEditor(instrument: Instrument, tabId: string): string {
   const mp = instrument.mouthpiece || {};
   const hasFipple = mp.fipple !== undefined;
   const hasEmbouchure = mp.embouchureHole !== undefined;
-  // Detect NAF vs simple fipple based on presence of fippleFactor or windwayHeight
-  const isNAF = hasFipple && (mp.fipple?.fippleFactor !== undefined || mp.fipple?.windwayHeight !== undefined);
+  // Determine which type is selected - default to fipple if neither is set
+  const mpType = hasFipple ? "fipple" : hasEmbouchure ? "embouchure" : "fipple";
 
   return `
     <div class="form-row">
@@ -264,65 +264,73 @@ function renderMouthpieceEditor(instrument: Instrument, tabId: string): string {
         <label>Splitting-edge Position</label>
         <input type="number" step="0.01" id="mp-position-${tabId}" value="${mp.position || 0}" />
       </div>
-      <div class="form-group">
-        <label>Type</label>
-        <select id="mp-type-${tabId}">
-          <option value="naf" ${isNAF ? "selected" : ""}>Fipple (NAF)</option>
-          <option value="fipple" ${hasFipple && !isNAF ? "selected" : ""}>Fipple (Whistle/Recorder)</option>
-          <option value="embouchure" ${hasEmbouchure ? "selected" : ""}>Embouchure (Flute)</option>
-        </select>
-      </div>
     </div>
-    ${
-      hasFipple
-        ? `
-    <div id="fipple-config-${tabId}">
+    <div class="form-row mouthpiece-type-row">
+      <label class="radio-label">
+        <input type="radio" name="mp-type-${tabId}" value="fipple" ${mpType === "fipple" ? "checked" : ""} />
+        Fipple Mouthpiece
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="mp-type-${tabId}" value="embouchure" ${mpType === "embouchure" ? "checked" : ""} />
+        Embouchure Hole
+      </label>
+    </div>
+    <div id="fipple-config-${tabId}" style="${mpType === "fipple" ? "" : "display:none"}">
       <div class="form-row">
         <div class="form-group">
           <label>TSH Length</label>
-          <input type="number" step="0.01" id="fipple-length-${tabId}" value="${mp.fipple?.windowLength || 8}" />
+          <input type="number" step="0.01" id="fipple-length-${tabId}" value="${mp.fipple?.windowLength || ""}" />
         </div>
         <div class="form-group">
           <label>TSH Width</label>
-          <input type="number" step="0.01" id="fipple-width-${tabId}" value="${mp.fipple?.windowWidth || 10}" />
+          <input type="number" step="0.01" id="fipple-width-${tabId}" value="${mp.fipple?.windowWidth || ""}" />
+        </div>
+        <div class="form-group">
+          <label>Window Height</label>
+          <input type="number" step="0.01" id="fipple-height-${tabId}" value="${mp.fipple?.windowHeight || ""}" />
         </div>
       </div>
-      <div class="form-row" id="naf-params-${tabId}" style="${isNAF ? "" : "display:none"}">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Windway Length</label>
+          <input type="number" step="0.01" id="windway-length-${tabId}" value="${mp.fipple?.windwayLength || ""}" />
+        </div>
         <div class="form-group">
           <label>Flue Depth</label>
-          <input type="number" step="0.001" id="windway-height-${tabId}" value="${mp.fipple?.windwayHeight || ""}" placeholder="optional" />
+          <input type="number" step="0.001" id="windway-height-${tabId}" value="${mp.fipple?.windwayHeight || ""}" />
         </div>
         <div class="form-group">
           <label>Fipple Factor</label>
-          <input type="number" step="0.00001" id="fipple-factor-${tabId}" value="${mp.fipple?.fippleFactor ?? 1.0}" />
+          <input type="number" step="0.00001" id="fipple-factor-${tabId}" value="${mp.fipple?.fippleFactor ?? ""}" />
         </div>
       </div>
     </div>
-    `
-        : ""
-    }
-    ${
-      hasEmbouchure
-        ? `
-    <div id="embouchure-config-${tabId}">
+    <div id="embouchure-config-${tabId}" style="${mpType === "embouchure" ? "" : "display:none"}">
       <div class="form-row">
         <div class="form-group">
           <label>Length</label>
-          <input type="number" step="0.1" id="emb-length-${tabId}" value="${mp.embouchureHole?.length || 12}" />
+          <input type="number" step="0.1" id="emb-length-${tabId}" value="${mp.embouchureHole?.length || ""}" />
         </div>
         <div class="form-group">
           <label>Width</label>
-          <input type="number" step="0.1" id="emb-width-${tabId}" value="${mp.embouchureHole?.width || 10}" />
+          <input type="number" step="0.1" id="emb-width-${tabId}" value="${mp.embouchureHole?.width || ""}" />
         </div>
         <div class="form-group">
           <label>Height</label>
-          <input type="number" step="0.1" id="emb-height-${tabId}" value="${mp.embouchureHole?.height || 5}" />
+          <input type="number" step="0.1" id="emb-height-${tabId}" value="${mp.embouchureHole?.height || ""}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Airstream Length</label>
+          <input type="number" step="0.1" id="airstream-length-${tabId}" value="${mp.embouchureHole?.airstreamLength || ""}" />
+        </div>
+        <div class="form-group">
+          <label>Flue Depth</label>
+          <input type="number" step="0.001" id="emb-windway-height-${tabId}" value="${mp.embouchureHole?.windwayHeight || ""}" />
         </div>
       </div>
     </div>
-    `
-        : ""
-    }
   `;
 }
 
@@ -373,31 +381,26 @@ function bindInstrumentEditorEvents(tabId: string, instrumentId: string) {
     });
   });
 
-  // Mouthpiece type change - toggle NAF params visibility
-  const mpTypeSelect = $<HTMLSelectElement>(`#mp-type-${tabId}`);
-  mpTypeSelect?.addEventListener("change", () => {
-    const nafParams = $(`#naf-params-${tabId}`);
-    const fippleConfig = $(`#fipple-config-${tabId}`);
-    const embouchureConfig = $(`#embouchure-config-${tabId}`);
+  // Mouthpiece type change - toggle config visibility
+  const mpTypeRadios = panel.querySelectorAll<HTMLInputElement>(`input[name="mp-type-${tabId}"]`);
+  mpTypeRadios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      const fippleConfig = $(`#fipple-config-${tabId}`);
+      const embouchureConfig = $(`#embouchure-config-${tabId}`);
 
-    if (mpTypeSelect.value === "naf") {
-      if (nafParams) nafParams.style.display = "";
-      if (fippleConfig) fippleConfig.style.display = "";
-      if (embouchureConfig) embouchureConfig.style.display = "none";
-    } else if (mpTypeSelect.value === "fipple") {
-      if (nafParams) nafParams.style.display = "none";
-      if (fippleConfig) fippleConfig.style.display = "";
-      if (embouchureConfig) embouchureConfig.style.display = "none";
-    } else if (mpTypeSelect.value === "embouchure") {
-      if (nafParams) nafParams.style.display = "none";
-      if (fippleConfig) fippleConfig.style.display = "none";
-      if (embouchureConfig) embouchureConfig.style.display = "";
-    }
-    updateInstrumentFromEditor(tabId, instrumentId);
+      if (radio.value === "fipple" && radio.checked) {
+        if (fippleConfig) fippleConfig.style.display = "";
+        if (embouchureConfig) embouchureConfig.style.display = "none";
+      } else if (radio.value === "embouchure" && radio.checked) {
+        if (fippleConfig) fippleConfig.style.display = "none";
+        if (embouchureConfig) embouchureConfig.style.display = "";
+      }
+      updateInstrumentFromEditor(tabId, instrumentId);
+    });
   });
 
   // Mouthpiece input changes
-  panel.querySelectorAll('[id^="mp-"], [id^="fipple-"], [id^="windway-"], [id^="emb-"]').forEach((input) => {
+  panel.querySelectorAll('[id^="mp-"], [id^="fipple-"], [id^="windway-"], [id^="emb-"], [id^="airstream-"]').forEach((input) => {
     input.addEventListener("change", () => {
       updateInstrumentFromEditor(tabId, instrumentId);
     });
@@ -460,50 +463,45 @@ function updateInstrumentFromEditor(tabId: string, instrumentId: string) {
   const mpPositionInput = $<HTMLInputElement>(`#mp-position-${tabId}`);
   if (mpPositionInput) inst.mouthpiece.position = parseFloat(mpPositionInput.value) || 0;
 
-  const mpTypeSelect = $<HTMLSelectElement>(`#mp-type-${tabId}`);
-  if (mpTypeSelect) {
-    const mpType = mpTypeSelect.value;
+  // Get selected mouthpiece type from radio buttons
+  const mpTypeRadio = $<HTMLInputElement>(`input[name="mp-type-${tabId}"]:checked`);
+  const mpType = mpTypeRadio?.value || "fipple";
 
-    if (mpType === "naf" || mpType === "fipple") {
-      // Read fipple values
-      const windowWidth = parseFloat($<HTMLInputElement>(`#fipple-width-${tabId}`)?.value || "0");
-      const windowLength = parseFloat($<HTMLInputElement>(`#fipple-length-${tabId}`)?.value || "0");
-      const windowHeightVal = $<HTMLInputElement>(`#fipple-height-${tabId}`)?.value;
-      const windowHeight = windowHeightVal ? parseFloat(windowHeightVal) : undefined;
+  if (mpType === "fipple") {
+    // Read all fipple values
+    const windowLengthVal = $<HTMLInputElement>(`#fipple-length-${tabId}`)?.value;
+    const windowWidthVal = $<HTMLInputElement>(`#fipple-width-${tabId}`)?.value;
+    const windowHeightVal = $<HTMLInputElement>(`#fipple-height-${tabId}`)?.value;
+    const windwayLengthVal = $<HTMLInputElement>(`#windway-length-${tabId}`)?.value;
+    const windwayHeightVal = $<HTMLInputElement>(`#windway-height-${tabId}`)?.value;
+    const fippleFactorVal = $<HTMLInputElement>(`#fipple-factor-${tabId}`)?.value;
 
-      inst.mouthpiece.fipple = {
-        windowWidth,
-        windowLength,
-        windowHeight,
-      };
+    inst.mouthpiece.fipple = {
+      windowLength: windowLengthVal ? parseFloat(windowLengthVal) : undefined,
+      windowWidth: windowWidthVal ? parseFloat(windowWidthVal) : undefined,
+      windowHeight: windowHeightVal ? parseFloat(windowHeightVal) : undefined,
+      windwayLength: windwayLengthVal ? parseFloat(windwayLengthVal) : undefined,
+      windwayHeight: windwayHeightVal ? parseFloat(windwayHeightVal) : undefined,
+      fippleFactor: fippleFactorVal ? parseFloat(fippleFactorVal) : undefined,
+    };
 
-      // NAF-specific fields
-      if (mpType === "naf") {
-        const fippleFactorVal = $<HTMLInputElement>(`#fipple-factor-${tabId}`)?.value;
-        const windwayHeightVal = $<HTMLInputElement>(`#windway-height-${tabId}`)?.value;
-        const windwayLengthVal = $<HTMLInputElement>(`#windway-length-${tabId}`)?.value;
+    delete inst.mouthpiece.embouchureHole;
+  } else if (mpType === "embouchure") {
+    const lengthVal = $<HTMLInputElement>(`#emb-length-${tabId}`)?.value;
+    const widthVal = $<HTMLInputElement>(`#emb-width-${tabId}`)?.value;
+    const heightVal = $<HTMLInputElement>(`#emb-height-${tabId}`)?.value;
+    const airstreamLengthVal = $<HTMLInputElement>(`#airstream-length-${tabId}`)?.value;
+    const embWindwayHeightVal = $<HTMLInputElement>(`#emb-windway-height-${tabId}`)?.value;
 
-        if (fippleFactorVal) inst.mouthpiece.fipple.fippleFactor = parseFloat(fippleFactorVal);
-        if (windwayHeightVal) inst.mouthpiece.fipple.windwayHeight = parseFloat(windwayHeightVal);
-        if (windwayLengthVal) inst.mouthpiece.fipple.windwayLength = parseFloat(windwayLengthVal);
-      }
+    inst.mouthpiece.embouchureHole = {
+      length: lengthVal ? parseFloat(lengthVal) : undefined,
+      width: widthVal ? parseFloat(widthVal) : undefined,
+      height: heightVal ? parseFloat(heightVal) : undefined,
+      airstreamLength: airstreamLengthVal ? parseFloat(airstreamLengthVal) : undefined,
+      windwayHeight: embWindwayHeightVal ? parseFloat(embWindwayHeightVal) : undefined,
+    };
 
-      delete inst.mouthpiece.embouchureHole;
-    } else if (mpType === "embouchure") {
-      const length = parseFloat($<HTMLInputElement>(`#emb-length-${tabId}`)?.value || "0");
-      const width = parseFloat($<HTMLInputElement>(`#emb-width-${tabId}`)?.value || "0");
-      const height = parseFloat($<HTMLInputElement>(`#emb-height-${tabId}`)?.value || "0");
-
-      inst.mouthpiece.embouchureHole = {
-        length,
-        width,
-        height,
-        airstreamLength: length, // Default to same as length
-        airstreamHeight: height * 0.5, // Default estimate
-      };
-
-      delete inst.mouthpiece.fipple;
-    }
+    delete inst.mouthpiece.fipple;
   }
 
   // Update bore points

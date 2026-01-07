@@ -626,6 +626,29 @@ html, body {
   flex: 1;
 }
 
+/* Mouthpiece Type Radio Buttons */
+.mouthpiece-type-row {
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.radio-label input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent-primary);
+}
+
 /* Tables */
 .data-table {
   width: 100%;
