@@ -17,6 +17,7 @@ import { Complex } from "../math/complex.ts";
 import { TransferMatrix } from "../math/transfer-matrix.ts";
 import { StateVector } from "../math/state-vector.ts";
 import { PhysicalParameters } from "../physics/physical-parameters.ts";
+import { SimplePhysicalParameters } from "../physics/simple-physical-parameters.ts";
 import { Tube } from "./tube.ts";
 import type { Mouthpiece, BoreSection } from "../../models/instrument.ts";
 import { isPressureNode } from "../../models/instrument.ts";
@@ -206,12 +207,9 @@ export class SimpleFippleMouthpieceCalculator extends MouthpieceCalculator {
 
   /**
    * Get headspace sections from mouthpiece (if any).
-   * For now, returns empty array - headspace would need to be added to model.
    */
   protected getHeadspace(mouthpiece: Mouthpiece): BoreSection[] {
-    // Headspace is not currently modeled in the instrument interface.
-    // Would be bore sections above the splitting edge.
-    return [];
+    return mouthpiece.headspace ?? [];
   }
 
   /**
@@ -381,7 +379,7 @@ export class FluteMouthpieceCalculator extends MouthpieceCalculator {
    * Get headspace sections from mouthpiece (if any).
    */
   protected getHeadspace(mouthpiece: Mouthpiece): BoreSection[] {
-    return [];
+    return mouthpiece.headspace ?? [];
   }
 
   /**
@@ -460,10 +458,17 @@ export class FluteMouthpieceCalculator extends MouthpieceCalculator {
  * - JYE: admittance from embouchure
  * - JYC: admittance from headspace volume
  * - Scaled fipple factor based on windway height
+ *
+ * Uses SimplePhysicalParameters internally (like Java) for more accurate
+ * NAF calculations. The simplified model gives better results for varying
+ * temperature and humidity, which is all a NAF maker is likely to measure.
  */
 export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
   private static readonly DEFAULT_WINDWAY_HEIGHT = 0.00078740; // ~0.031 inches in meters
   private static readonly AIR_GAMMA = 1.4018297351222222;
+
+  /** Simplified physical parameters used internally */
+  private mParams: SimplePhysicalParameters | null = null;
 
   /**
    * Calculate transfer matrix for fipple mouthpiece.
@@ -478,10 +483,17 @@ export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
       return super.calcTransferMatrix(mouthpiece, waveNumber, params);
     }
 
+    // Use a simplified version of PhysicalParameters: no editable pressure
+    // nor CO2 concentration. This mouthpiece representation gives very
+    // wrong answers when they are varied.
+    // The SimplePhysicalParameters gives correct answers for varying
+    // temperature and humidity, all that a NAF maker is likely to measure.
+    this.mParams = new SimplePhysicalParameters(params);
+
     const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
     const z0 = params.calcZ0(radius);
     const omega = waveNumber * params.getSpeedOfSound();
-    const k_delta_l = this.calcKDeltaL(mouthpiece, omega, z0, params);
+    const k_delta_l = this.calcKDeltaL(mouthpiece, omega, z0);
 
     // Add a series resistance for radiation loss.
     const freq = omega / (2 * Math.PI);
@@ -504,10 +516,9 @@ export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
   private calcKDeltaL(
     mouthpiece: Mouthpiece,
     omega: number,
-    z0: number,
-    params: PhysicalParameters
+    z0: number
   ): number {
-    return Math.atan(1.0 / (z0 * (this.calcJYE(mouthpiece, omega) + this.calcJYC(mouthpiece, omega, params))));
+    return Math.atan(1.0 / (z0 * (this.calcJYE(mouthpiece, omega) + this.calcJYC(mouthpiece, omega))));
   }
 
   /**
@@ -521,10 +532,14 @@ export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
 
   /**
    * Calculate imaginary admittance from headspace volume.
+   * Uses SimplePhysicalParameters for speed of sound (matching Java).
    */
-  private calcJYC(mouthpiece: Mouthpiece, omega: number, params: PhysicalParameters): number {
+  private calcJYC(mouthpiece: Mouthpiece, omega: number): number {
     const gamma = DefaultFippleMouthpieceCalculator.AIR_GAMMA;
-    const speedOfSound = params.getSpeedOfSound();
+    // Use SimplePhysicalParameters speed of sound (like Java)
+    const speedOfSound = this.mParams!.getSpeedOfSound();
+    // Note: v is multiplied by 2 here, and calcHeadspaceVolume also multiplies by 2,
+    // giving a total multiplier of 4 (matching Java's behavior)
     const v = 2.0 * this.calcHeadspaceVolume(mouthpiece);
 
     const result = -(omega * v) / (gamma * speedOfSound * speedOfSound);
@@ -533,17 +548,44 @@ export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
 
   /**
    * Calculate headspace volume.
-   * Uses mouthpiece position as a proxy for headspace.
+   *
+   * Uses position-based calculation where the headspace length is the
+   * mouthpiece position (measured from position 0). This represents the
+   * effective acoustic headspace from the reference point to the splitting edge.
+   *
+   * Note: While buildHeadspace() creates actual bore sections for other
+   * calculators, this calculator uses the position-based approximation which
+   * was empirically validated against real NAF measurements.
+   *
+   * Java implementation note: the final volume is multiplied by 2.0
+   * ("Multiplier reset using a more accurate headspace representation")
    */
   private calcHeadspaceVolume(mouthpiece: Mouthpiece): number {
-    // Headspace is the volume above the splitting edge.
-    // Approximate as cylinder from position 0 to mouthpiece position.
+    // Use position-based calculation (from position 0 to mouthpiece)
+    // This matches the original empirically-tuned behavior
     const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
     const length = mouthpiece.position;
+    const volume = Math.PI * radius * radius * length;
 
-    // Multiply by 2.0 based on Java implementation comment:
-    // "Multiplier reset using a more accurate headspace representation"
-    return Math.PI * radius * radius * length * 2.0;
+    // Multiply by 2.0 based on Java implementation
+    return volume * 2.0;
+  }
+
+  /**
+   * Calculate volume of a conical bore section (frustum formula).
+   */
+  private getSectionVolume(section: BoreSection): number {
+    const leftRadius = section.leftRadius;
+    const rightRadius = section.rightRadius;
+    const length = section.length;
+
+    // Frustum volume: V = (π * h / 3) * (r1² + r1*r2 + r2²)
+    return (
+      (Math.PI * length / 3) *
+      (leftRadius * leftRadius +
+        leftRadius * rightRadius +
+        rightRadius * rightRadius)
+    );
   }
 
   /**

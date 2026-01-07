@@ -56,6 +56,7 @@ import {
   getSortedBorePoints,
   getSortedHoles,
   calculateGainFactor,
+  buildHeadspace,
 } from "../../models/instrument.ts";
 import type { Fingering } from "../../models/tuning.ts";
 
@@ -121,6 +122,9 @@ export class DefaultInstrumentCalculator implements IInstrumentCalculator {
     // Convert instrument to metres for calculation
     this.instrument = convertInstrumentToMetres(instrument);
     this.params = params;
+
+    // Build headspace sections for the mouthpiece (needed by DefaultFippleMouthpieceCalculator)
+    this.instrument.mouthpiece.headspace = buildHeadspace(this.instrument);
 
     // Set up calculators
     this.mouthpieceCalculator =

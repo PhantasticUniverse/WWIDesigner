@@ -309,6 +309,8 @@ export interface Mouthpiece {
   lipReed?: LipReed;
   /** Bore diameter at mouthpiece (derived) */
   boreDiameter?: number;
+  /** Headspace bore sections above the mouthpiece position (derived) */
+  headspace?: BoreSection[];
 }
 
 /**
@@ -651,4 +653,75 @@ export function getLowestBorePoint(instrument: Instrument): BorePoint {
 export function getBoreLength(instrument: Instrument): number {
   const sorted = getSortedBorePoints(instrument);
   return sorted[sorted.length - 1]!.borePosition - sorted[0]!.borePosition;
+}
+
+/**
+ * Build headspace bore sections from bore points above mouthpiece position.
+ *
+ * In Java, Instrument.updateComponents() creates bore sections and puts those
+ * with rightBorePosition <= mouthpiecePosition into mouthpiece.headspace.
+ * This function replicates that behavior.
+ *
+ * @param instrument The instrument to build headspace for
+ * @returns Array of BoreSection objects representing the headspace
+ */
+export function buildHeadspace(instrument: Instrument): BoreSection[] {
+  const mpPosition = instrument.mouthpiece.position;
+  const sortedPoints = getSortedBorePoints(instrument);
+  const headspace: BoreSection[] = [];
+
+  if (sortedPoints.length < 2) {
+    return headspace;
+  }
+
+  // Create bore sections for points above (or at) mouthpiece position
+  for (let i = 0; i < sortedPoints.length - 1; i++) {
+    const left = sortedPoints[i]!;
+    const right = sortedPoints[i + 1]!;
+
+    // Section is entirely above mouthpiece
+    if (right.borePosition <= mpPosition) {
+      headspace.push({
+        length: right.borePosition - left.borePosition,
+        leftRadius: left.boreDiameter / 2,
+        rightRadius: right.boreDiameter / 2,
+        rightBorePosition: right.borePosition,
+      });
+    } else if (left.borePosition < mpPosition) {
+      // Partial section - interpolate to mouthpiece position
+      const sectionLength = right.borePosition - left.borePosition;
+      if (sectionLength > 0) {
+        const ratio = (mpPosition - left.borePosition) / sectionLength;
+        const mpDiameter =
+          left.boreDiameter + ratio * (right.boreDiameter - left.boreDiameter);
+        headspace.push({
+          length: mpPosition - left.borePosition,
+          leftRadius: left.boreDiameter / 2,
+          rightRadius: mpDiameter / 2,
+          rightBorePosition: mpPosition,
+        });
+      }
+      break; // No more sections above mouthpiece
+    } else {
+      // Both points are below mouthpiece, stop
+      break;
+    }
+  }
+
+  return headspace;
+}
+
+/**
+ * Calculate the volume of a bore section (frustum of a cone).
+ *
+ * @param section The bore section
+ * @returns Volume in cubic metres (if dimensions are in metres)
+ */
+export function getBoreSectionVolume(section: BoreSection): number {
+  const r1 = section.leftRadius;
+  const r2 = section.rightRadius;
+  const h = section.length;
+
+  // Frustum volume formula: V = (π * h / 3) * (r1² + r1*r2 + r2²)
+  return (Math.PI * h / 3) * (r1 * r1 + r1 * r2 + r2 * r2);
 }
