@@ -18,7 +18,11 @@ import { SimpleInstrumentTuner, calculateDeviationCents } from "../../src/core/m
 import { PlayingRange } from "../../src/core/modelling/playing-range.ts";
 import { cents } from "../../src/core/constants.ts";
 import { DefaultHoleCalculator } from "../../src/core/geometry/hole-calculator.ts";
-import { thickFlangedEndCalculator } from "../../src/core/geometry/termination-calculator.ts";
+import {
+  thickFlangedEndCalculator,
+  unflangedEndCalculator,
+} from "../../src/core/geometry/termination-calculator.ts";
+import { simpleFippleCalculator } from "../../src/core/geometry/mouthpiece-calculator.ts";
 import type { Instrument } from "../../src/models/instrument.ts";
 import type { Tuning, Fingering } from "../../src/models/tuning.ts";
 
@@ -209,7 +213,19 @@ describe("BP7 Whistle Impedance Parity (InstrumentImpedanceTest.java)", () => {
 
     // Java test uses: PhysicalParameters(27.0, TemperatureType.C, 98.4, 100, 0.04)
     params = new PhysicalParameters(27, "C", 98.4, 100, 0.04);
-    calculator = new DefaultInstrumentCalculator(instrument, params);
+
+    // Java WhistleCalculator uses these specific calculators:
+    // - SimpleFippleMouthpieceCalculator (NOT DefaultFippleMouthpieceCalculator)
+    // - UnflangedEndCalculator (NOT FlangedEndCalculator)
+    // - DefaultHoleCalculator with no size multiplier
+    calculator = new DefaultInstrumentCalculator(
+      instrument,
+      params,
+      simpleFippleCalculator,       // WhistleCalculator uses SimpleFipple
+      unflangedEndCalculator,       // WhistleCalculator uses Unflanged
+      new DefaultHoleCalculator(),  // No size multiplier
+      undefined
+    );
   });
 
   test("loads BP7 whistle files correctly", () => {
