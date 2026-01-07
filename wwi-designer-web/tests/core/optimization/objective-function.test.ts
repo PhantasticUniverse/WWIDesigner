@@ -16,17 +16,23 @@ import {
   HoleGroupPositionObjectiveFunction,
   HoleGroupPositionFromTopObjectiveFunction,
   HoleGroupFromTopObjectiveFunction,
+  HoleGroupObjectiveFunction,
   BoreDiameterFromBottomObjectiveFunction,
   BoreDiameterFromTopObjectiveFunction,
   BasicTaperObjectiveFunction,
   SingleTaperRatioObjectiveFunction,
+  SingleTaperSimpleRatioObjectiveFunction,
   FippleFactorObjectiveFunction,
   WindowHeightObjectiveFunction,
   HoleAndTaperObjectiveFunction,
   HoleAndBoreDiameterFromTopObjectiveFunction,
+  HoleAndBoreDiameterFromBottomObjectiveFunction,
   BetaObjectiveFunction,
   AirstreamLengthObjectiveFunction,
   NafHoleSizeObjectiveFunction,
+  ReedCalibratorObjectiveFunction,
+  StopperPositionObjectiveFunction,
+  ConicalBoreObjectiveFunction,
   BoreLengthAdjustmentType,
 } from "../../../src/core/optimization/hole-position-objective.ts";
 import { CentDeviationEvaluator } from "../../../src/core/optimization/evaluator.ts";
@@ -2125,6 +2131,545 @@ describe("Objective Functions", () => {
         tuning,
         evaluator,
         2
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("HoleGroupObjectiveFunction", () => {
+    test("creates merged objective function", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const holeGroups = [[0, 1], [2]];
+
+      const objective = new HoleGroupObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        holeGroups
+      );
+
+      // Should have dimensions from grouped position + hole sizes
+      expect(objective.getNrDimensions()).toBeGreaterThanOrEqual(6);
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createSimpleWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const holeGroups = [[0, 1], [2]];
+
+      const objective = new HoleGroupObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        holeGroups
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("HoleAndBoreDiameterFromBottomObjectiveFunction", () => {
+    const createWhistleWithMultipleBorePoints = (): Instrument => ({
+      name: "Test Whistle",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16 },
+        { borePosition: 100, boreDiameter: 15 },
+        { borePosition: 200, boreDiameter: 14 },
+        { borePosition: 300, boreDiameter: 13 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 15 },
+    });
+
+    test("creates merged objective function", () => {
+      const whistle = createWhistleWithMultipleBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreDiameterFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        1
+      );
+
+      // bore + hole spacings + hole sizes + bore diameter ratios
+      expect(objective.getNrDimensions()).toBeGreaterThanOrEqual(7);
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createWhistleWithMultipleBorePoints();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new HoleAndBoreDiameterFromBottomObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        1
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("ReedCalibratorObjectiveFunction", () => {
+    const createClarinetWithSingleReed = (): Instrument => ({
+      name: "Test Clarinet",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        beta: 0.35,
+        singleReed: {
+          alpha: 0.5,
+          crowFreq: 1500,
+          openingFactor: 0.5,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 15 },
+        { borePosition: 600, boreDiameter: 15 },
+      ],
+      hole: [
+        { position: 400, diameter: 10, height: 5 },
+        { position: 440, diameter: 10, height: 5 },
+        { position: 480, diameter: 10, height: 5 },
+      ],
+      termination: { flangeDiameter: 20 },
+    });
+
+    test("creates two-dimension objective", () => {
+      const clarinet = createClarinetWithSingleReed();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(clarinet, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ReedCalibratorObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      expect(objective.getNrDimensions()).toBe(2);
+    });
+
+    test("getGeometryPoint returns alpha and beta", () => {
+      const clarinet = createClarinetWithSingleReed();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(clarinet, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ReedCalibratorObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      expect(geometry.length).toBe(2);
+      expect(geometry[0]).toBe(0.5); // alpha
+      expect(geometry[1]).toBe(0.35); // beta
+    });
+
+    test("setGeometryPoint modifies alpha and beta", () => {
+      const clarinet = createClarinetWithSingleReed();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(clarinet, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ReedCalibratorObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      objective.setGeometryPoint([0.7, 0.4]);
+
+      const instrument = calc.getInstrument();
+      expect(instrument.mouthpiece.singleReed!.alpha).toBe(0.7);
+      expect(instrument.mouthpiece.beta).toBe(0.4);
+    });
+
+    test("constraints are dimensionless", () => {
+      const clarinet = createClarinetWithSingleReed();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(clarinet, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ReedCalibratorObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const constraints = objective.getConstraints();
+      const constraintList = constraints.getConstraints();
+
+      expect(constraintList.length).toBe(2);
+      expect(constraintList[0]!.type).toBe("DIMENSIONLESS");
+      expect(constraintList[1]!.type).toBe("DIMENSIONLESS");
+    });
+  });
+
+  describe("StopperPositionObjectiveFunction", () => {
+    const createFluteWithEmbouchure = (): Instrument => ({
+      name: "Test Flute",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 20,
+        embouchureHole: {
+          length: 12,
+          width: 10,
+          height: 5,
+          airstreamLength: 8,
+          airstreamHeight: 2,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 19 },
+        { borePosition: 600, boreDiameter: 19 },
+      ],
+      hole: [
+        { position: 400, diameter: 8, height: 4 },
+        { position: 440, diameter: 8, height: 4 },
+        { position: 480, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates single-dimension objective", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new StopperPositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        false
+      );
+
+      expect(objective.getNrDimensions()).toBe(1);
+    });
+
+    test("getGeometryPoint returns stopper distance", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new StopperPositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        false
+      );
+
+      const geometry = objective.getGeometryPoint();
+      expect(geometry.length).toBe(1);
+      // Should be mouthpiecePosition - topOfBore - halfEmbouchureLength
+      // = 0.02 - 0 - 0.006 = 0.014
+      expect(geometry[0]).toBeCloseTo(0.014, 3);
+    });
+
+    test("constraint is dimensional", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new StopperPositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        false
+      );
+
+      const constraints = objective.getConstraints();
+      const constraintList = constraints.getConstraints();
+
+      expect(constraintList.length).toBe(1);
+      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+    });
+
+    test("value returns finite error", () => {
+      const flute = createFluteWithEmbouchure();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(flute, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new StopperPositionObjectiveFunction(
+        calc,
+        tuning,
+        evaluator,
+        false
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("ConicalBoreObjectiveFunction", () => {
+    const createConicalWhistle = (): Instrument => ({
+      name: "Test Whistle",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 16 },
+        { borePosition: 150, boreDiameter: 14 },
+        { borePosition: 300, boreDiameter: 12 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 15 },
+    });
+
+    test("creates single-dimension objective", () => {
+      const whistle = createConicalWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ConicalBoreObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      expect(objective.getNrDimensions()).toBe(1);
+    });
+
+    test("getGeometryPoint returns foot diameter", () => {
+      const whistle = createConicalWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ConicalBoreObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      expect(geometry.length).toBe(1);
+      expect(geometry[0]).toBeCloseTo(0.012, 4); // 12mm in metres
+    });
+
+    test("setGeometryPoint scales bottom half of bore", () => {
+      const whistle = createConicalWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ConicalBoreObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      // Increase foot diameter by 50%
+      objective.setGeometryPoint([0.018]);
+
+      const instrument = calc.getInstrument();
+      // Find the bottom bore point
+      const sortedBore = [...instrument.borePoint].sort(
+        (a, b) => a.borePosition - b.borePosition
+      );
+      const bottomPoint = sortedBore[sortedBore.length - 1]!;
+      expect(bottomPoint.boreDiameter).toBeCloseTo(0.018, 4);
+    });
+
+    test("constraint is dimensional", () => {
+      const whistle = createConicalWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ConicalBoreObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const constraints = objective.getConstraints();
+      const constraintList = constraints.getConstraints();
+
+      expect(constraintList.length).toBe(1);
+      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+      expect(constraintList[0]!.name).toBe("Foot diameter");
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createConicalWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new ConicalBoreObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const value = objective.value(objective.getGeometryPoint());
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("SingleTaperSimpleRatioObjectiveFunction", () => {
+    const createTaperedWhistle = (): Instrument => ({
+      name: "Test Whistle",
+      lengthType: "MM",
+      mouthpiece: {
+        position: 0,
+        fipple: {
+          windowWidth: 10,
+          windowLength: 8,
+          windowHeight: 3,
+        },
+      },
+      borePoint: [
+        { borePosition: 0, boreDiameter: 18 },
+        { borePosition: 100, boreDiameter: 18 },
+        { borePosition: 200, boreDiameter: 14 },
+        { borePosition: 300, boreDiameter: 14 },
+      ],
+      hole: [
+        { position: 200, diameter: 8, height: 4 },
+        { position: 220, diameter: 8, height: 4 },
+        { position: 240, diameter: 8, height: 4 },
+      ],
+      termination: { flangeDiameter: 0 },
+    });
+
+    test("creates three-dimension objective", () => {
+      const whistle = createTaperedWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      expect(objective.getNrDimensions()).toBe(3);
+    });
+
+    test("getGeometryPoint returns taper parameters", () => {
+      const whistle = createTaperedWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      expect(geometry.length).toBe(3);
+      // Taper ratio: 18/14 ≈ 1.286
+      expect(geometry[0]).toBeCloseTo(18 / 14, 2);
+    });
+
+    test("setGeometryPoint round-trips correctly", () => {
+      const whistle = createTaperedWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const geometry = objective.getGeometryPoint();
+      objective.setGeometryPoint(geometry);
+
+      const newGeometry = objective.getGeometryPoint();
+      // Allow some tolerance due to bore point reconstruction
+      expect(newGeometry[0]).toBeCloseTo(geometry[0]!, 1);
+    });
+
+    test("constraints are all dimensionless", () => {
+      const whistle = createTaperedWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
+      );
+
+      const constraints = objective.getConstraints();
+      const constraintList = constraints.getConstraints();
+
+      expect(constraintList.length).toBe(3);
+      for (const constraint of constraintList) {
+        expect(constraint.type).toBe("DIMENSIONLESS");
+      }
+    });
+
+    test("value returns finite error", () => {
+      const whistle = createTaperedWhistle();
+      const tuning = createSimpleTuning();
+      const calc = new DefaultInstrumentCalculator(whistle, params);
+      const evaluator = new CentDeviationEvaluator(calc);
+
+      const objective = new SingleTaperSimpleRatioObjectiveFunction(
+        calc,
+        tuning,
+        evaluator
       );
 
       const value = objective.value(objective.getGeometryPoint());

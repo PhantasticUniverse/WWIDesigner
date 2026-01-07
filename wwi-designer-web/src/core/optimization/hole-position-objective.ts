@@ -2782,3 +2782,688 @@ export class HoleAndBoreDiameterFromTopObjectiveFunction extends MergedObjective
     this.constraints.setConstraintsName("Default");
   }
 }
+
+/**
+ * Objective function for bore length, hole positions (in groups), and hole diameters.
+ *
+ * Combines:
+ * - HoleGroupPositionObjectiveFunction: grouped hole positions
+ * - HoleSizeObjectiveFunction: hole diameters
+ *
+ * Ported from HoleGroupObjectiveFunction.java
+ */
+export class HoleGroupObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME =
+    "Grouped hole-position and hole size optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    holeGroups: number[][],
+    lengthAdjustmentMode: BoreLengthAdjustmentType = BoreLengthAdjustmentType.MOVE_BOTTOM
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HoleGroupPositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        holeGroups,
+        lengthAdjustmentMode
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.sumDimensions();
+    this.maxEvaluations = 20000 + (this.nrDimensions - 1) * 5000;
+    this.constraints.setObjectiveDisplayName(
+      HoleGroupObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("HoleGroupObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+  }
+}
+
+/**
+ * Objective function for hole positions and diameters, plus bore diameters
+ * at existing bore points from the bottom.
+ *
+ * Combines:
+ * - HolePositionObjectiveFunction: bore length + hole spacings
+ * - HoleSizeObjectiveFunction: hole diameters
+ * - BoreDiameterFromBottomObjectiveFunction: bore diameter ratios from bottom
+ *
+ * Ported from HoleAndBoreDiameterFromBottomObjectiveFunction.java
+ */
+export class HoleAndBoreDiameterFromBottomObjectiveFunction extends MergedObjectiveFunction {
+  static readonly DISPLAY_NAME =
+    "Hole, plus bore diameter from bottom, optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    unchangedBorePoints?: number
+  ) {
+    super(calculator, tuning, evaluator);
+
+    this.components = [
+      new HolePositionObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        BoreLengthAdjustmentType.MOVE_BOTTOM
+      ),
+      new HoleSizeObjectiveFunction(calculator, tuning, evaluator),
+      new BoreDiameterFromBottomObjectiveFunction(
+        calculator,
+        tuning,
+        evaluator,
+        unchangedBorePoints
+      ),
+    ];
+
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.maxEvaluations = 50000;
+    this.sumDimensions();
+    this.constraints.setObjectiveDisplayName(
+      HoleAndBoreDiameterFromBottomObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "HoleAndBoreDiameterFromBottomObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+  }
+}
+
+/**
+ * Objective function for optimization of reed instrument mouthpiece parameters.
+ * Optimizes both alpha (reed resonance) and beta (jet amplification) factors.
+ *
+ * Two dimension optimization.
+ *
+ * Ported from ReedCalibratorObjectiveFunction.java
+ */
+export class ReedCalibratorObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Mouthpiece parameters";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONLESS;
+  static readonly DISPLAY_NAME = "Reed calibrator";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 2;
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const mouthpiece = this.calculator.getInstrument().mouthpiece;
+    let alpha = 0.0;
+    let beta = mouthpiece?.beta ?? 0.0;
+
+    // Get alpha from whichever reed type is present
+    if (mouthpiece?.singleReed) {
+      alpha = mouthpiece.singleReed.alpha ?? 0.0;
+    } else if (mouthpiece?.doubleReed) {
+      alpha = mouthpiece.doubleReed.alpha ?? 0.0;
+    } else if (mouthpiece?.lipReed) {
+      alpha = mouthpiece.lipReed.alpha ?? 0.0;
+    }
+
+    return [alpha, beta];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const mouthpiece = instrument.mouthpiece;
+
+    if (mouthpiece) {
+      // Set alpha on whichever reed type is present
+      if (mouthpiece.singleReed) {
+        mouthpiece.singleReed.alpha = point[0]!;
+      } else if (mouthpiece.doubleReed) {
+        mouthpiece.doubleReed.alpha = point[0]!;
+      } else if (mouthpiece.lipReed) {
+        mouthpiece.lipReed.alpha = point[0]!;
+      }
+
+      mouthpiece.beta = point[1]!;
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        ReedCalibratorObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Alpha",
+        ReedCalibratorObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        ReedCalibratorObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Beta",
+        ReedCalibratorObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      ReedCalibratorObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("ReedCalibratorObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Alpha and beta typically range from 0 to 1
+    this.lowerBounds = [0.0, 0.0];
+    this.upperBounds = [1.0, 1.0];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for position of the flute stopper (headjoint length).
+ * Distance from topmost bore point to upper end of embouchure hole.
+ *
+ * Single dimension optimization using Brent optimizer.
+ *
+ * Ported from StopperPositionObjectiveFunction.java
+ */
+export class StopperPositionObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Stopper distance";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONAL;
+  static readonly DISPLAY_NAME = "Stopper position optimizer";
+  private static readonly MINIMUM_BORE_POINT_SPACING = 0.00001;
+
+  private preserveTaper: boolean;
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator,
+    preserveTaper: boolean = false
+  ) {
+    super(calculator, tuning, evaluator);
+    this.preserveTaper = preserveTaper;
+    this.nrDimensions = 1;
+    this.optimizerType = OptimizerType.BRENT;
+    this.setConstraints();
+  }
+
+  /**
+   * Get the position of the topmost bore point.
+   */
+  private getTopOfBore(): number {
+    const borePoints = this.calculator.getInstrument().borePoint;
+    let topPosition = borePoints[0]?.borePosition ?? 0;
+
+    for (const bp of borePoints) {
+      if (bp.borePosition < topPosition) {
+        topPosition = bp.borePosition;
+      }
+    }
+    return topPosition;
+  }
+
+  getGeometryPoint(): number[] {
+    const mouthpiece = this.calculator.getInstrument().mouthpiece;
+    const mouthpiecePosition = mouthpiece?.position ?? 0;
+
+    let distance = mouthpiecePosition - this.getTopOfBore();
+
+    // Subtract half the embouchure hole length if present
+    if (mouthpiece?.embouchureHole) {
+      distance -= 0.5 * mouthpiece.embouchureHole.length;
+    }
+
+    return [distance];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const mouthpiece = instrument.mouthpiece;
+    const mouthpiecePosition = mouthpiece?.position ?? 0;
+
+    // Sort bore points by position
+    const sortedBorePoints = [...instrument.borePoint].sort(
+      (a, b) => a.borePosition - b.borePosition
+    );
+
+    let newTopPosition = mouthpiecePosition - point[0]!;
+    if (mouthpiece?.embouchureHole) {
+      newTopPosition -= 0.5 * mouthpiece.embouchureHole.length;
+    }
+
+    if (this.preserveTaper && sortedBorePoints.length >= 2) {
+      // Interpolate bore diameter at new position
+      const topDiameter = this.getInterpolatedBoreDiameter(
+        sortedBorePoints,
+        newTopPosition
+      );
+      sortedBorePoints[0]!.boreDiameter = topDiameter;
+    }
+    sortedBorePoints[0]!.borePosition = newTopPosition;
+
+    // Move any bore points that would be above the new top position
+    for (let i = 1; i < sortedBorePoints.length; i++) {
+      const bp = sortedBorePoints[i]!;
+      if (bp.borePosition <= newTopPosition) {
+        newTopPosition +=
+          StopperPositionObjectiveFunction.MINIMUM_BORE_POINT_SPACING;
+        if (this.preserveTaper) {
+          const diameter = this.getInterpolatedBoreDiameter(
+            sortedBorePoints,
+            newTopPosition
+          );
+          bp.boreDiameter = diameter;
+        }
+        bp.borePosition = newTopPosition;
+      } else {
+        break;
+      }
+    }
+  }
+
+  /**
+   * Interpolate or extrapolate bore diameter at a given position.
+   */
+  private getInterpolatedBoreDiameter(
+    sortedBorePoints: typeof this.calculator.getInstrument.prototype.borePoint,
+    position: number
+  ): number {
+    if (sortedBorePoints.length < 2) {
+      return sortedBorePoints[0]?.boreDiameter ?? 0;
+    }
+
+    // Find bracketing points
+    for (let i = 0; i < sortedBorePoints.length - 1; i++) {
+      const lower = sortedBorePoints[i]!;
+      const upper = sortedBorePoints[i + 1]!;
+
+      if (position >= lower.borePosition && position <= upper.borePosition) {
+        // Interpolate
+        const t =
+          (position - lower.borePosition) /
+          (upper.borePosition - lower.borePosition);
+        return lower.boreDiameter + t * (upper.boreDiameter - lower.boreDiameter);
+      }
+    }
+
+    // Extrapolate using first or last two points
+    if (position < sortedBorePoints[0]!.borePosition) {
+      const p0 = sortedBorePoints[0]!;
+      const p1 = sortedBorePoints[1]!;
+      const slope =
+        (p1.boreDiameter - p0.boreDiameter) /
+        (p1.borePosition - p0.borePosition);
+      return p0.boreDiameter + slope * (position - p0.borePosition);
+    } else {
+      const p0 = sortedBorePoints[sortedBorePoints.length - 2]!;
+      const p1 = sortedBorePoints[sortedBorePoints.length - 1]!;
+      const slope =
+        (p1.boreDiameter - p0.boreDiameter) /
+        (p1.borePosition - p0.borePosition);
+      return p1.boreDiameter + slope * (position - p1.borePosition);
+    }
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        StopperPositionObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Stopper Distance",
+        StopperPositionObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      StopperPositionObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "StopperPositionObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentDistance = this.getGeometryPoint()[0]!;
+    // Stopper distance typically ranges from 10mm to 50mm (0.01m to 0.05m)
+    this.lowerBounds = [Math.max(0.01, currentDistance * 0.5)];
+    this.upperBounds = [Math.min(0.1, currentDistance * 2.0)];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Objective function for a simple conical bore.
+ * Optimizes the diameter at the foot, scaling interior bore points
+ * in the bottom half proportionally.
+ *
+ * Single dimension optimization using Brent optimizer.
+ *
+ * Ported from ConicalBoreObjectiveFunction.java
+ */
+export class ConicalBoreObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Bore size";
+  static readonly CONSTRAINT_TYPE = ConstraintType.DIMENSIONAL;
+  static readonly DISPLAY_NAME = "Conical bore optimizer";
+  static readonly AFFECTED_BORE_FRACTION = 0.5;
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 1;
+    this.optimizerType = OptimizerType.BRENT;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const sortedBorePoints = getSortedBorePoints(
+      this.calculator.getInstrument()
+    );
+    const bottomPoint = sortedBorePoints[sortedBorePoints.length - 1]!;
+    return [bottomPoint.boreDiameter];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const sortedBorePoints = getSortedBorePoints(instrument);
+    const bottomPoint = sortedBorePoints[sortedBorePoints.length - 1]!;
+    const topPosition = sortedBorePoints[0]!.borePosition;
+    const totalLength = bottomPoint.borePosition - topPosition;
+
+    const terminationChange = point[0]! - bottomPoint.boreDiameter;
+
+    // Change termination flange diameter to preserve flange width
+    if (instrument.termination) {
+      instrument.termination.flangeDiameter += terminationChange;
+    }
+
+    // Change diameter of the lower half of the bore proportionally
+    const fractionalChange = point[0]! / bottomPoint.boreDiameter;
+    for (const bp of sortedBorePoints) {
+      const fractionalPosition =
+        (bp.borePosition - topPosition) / totalLength;
+      if (
+        fractionalPosition >= ConicalBoreObjectiveFunction.AFFECTED_BORE_FRACTION
+      ) {
+        bp.boreDiameter *= fractionalChange;
+      }
+    }
+    bottomPoint.boreDiameter = point[0]!;
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        ConicalBoreObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Foot diameter",
+        ConicalBoreObjectiveFunction.CONSTRAINT_TYPE
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      ConicalBoreObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName("ConicalBoreObjectiveFunction");
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    const currentDiameter = this.getGeometryPoint()[0]!;
+    // Foot diameter typically ranges from 5mm to 30mm (0.005m to 0.03m)
+    this.lowerBounds = [Math.max(0.005, currentDiameter * 0.7)];
+    this.upperBounds = [Math.min(0.05, currentDiameter * 1.5)];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
+
+/**
+ * Minimum cone length constant used in taper calculations.
+ */
+const MINIMUM_CONE_LENGTH = 0.0001;
+
+/**
+ * Objective function for a three-section bore with a single tapered section.
+ * Uses simple ratio parameters for taper start and length.
+ *
+ * Optimization dimensions:
+ * - Taper ratio (head/foot diameter)
+ * - Taper start as fraction of bore length
+ * - Taper length as fraction of remaining bore
+ *
+ * Three dimension optimization using BOBYQA optimizer.
+ *
+ * Ported from SingleTaperSimpleRatioObjectiveFunction.java
+ */
+export class SingleTaperSimpleRatioObjectiveFunction extends BaseObjectiveFunction {
+  static readonly CONSTRAINT_CATEGORY = "Single bore taper";
+  static readonly DISPLAY_NAME = "Single taper (simple ratios) optimizer";
+
+  constructor(
+    calculator: IInstrumentCalculator,
+    tuning: Tuning,
+    evaluator: IEvaluator
+  ) {
+    super(calculator, tuning, evaluator);
+    this.nrDimensions = 3;
+    this.optimizerType = OptimizerType.BOBYQA;
+    this.setConstraints();
+  }
+
+  getGeometryPoint(): number[] {
+    const sortedBorePoints = getSortedBorePoints(
+      this.calculator.getInstrument()
+    );
+
+    if (sortedBorePoints.length < 2) {
+      return [1.0, 0.0, 1.0];
+    }
+
+    const topPoint = sortedBorePoints[0]!;
+    const nextPoint = sortedBorePoints[1]!;
+    const penultimatePoint = sortedBorePoints[sortedBorePoints.length - 2]!;
+    const bottomPoint = sortedBorePoints[sortedBorePoints.length - 1]!;
+
+    const boreLength = bottomPoint.borePosition - topPoint.borePosition;
+
+    // Taper ratio
+    const taperRatio = topPoint.boreDiameter / bottomPoint.boreDiameter;
+
+    let taperStart: number;
+    let taperEnd: number;
+
+    if (Math.abs(topPoint.boreDiameter - bottomPoint.boreDiameter) < 0.0001) {
+      // Bore doesn't really taper
+      taperStart = topPoint.borePosition;
+      taperEnd = bottomPoint.borePosition;
+    } else {
+      // Determine taper start
+      if (Math.abs(topPoint.boreDiameter - nextPoint.boreDiameter) < 0.0001) {
+        taperStart = nextPoint.borePosition;
+      } else {
+        taperStart = topPoint.borePosition;
+      }
+
+      // Determine taper end
+      if (
+        Math.abs(bottomPoint.boreDiameter - penultimatePoint.boreDiameter) <
+        0.0001
+      ) {
+        taperEnd = penultimatePoint.borePosition;
+      } else {
+        taperEnd = bottomPoint.borePosition;
+      }
+    }
+
+    const taperStartRatio =
+      (taperStart - topPoint.borePosition) / boreLength;
+    const taperLengthRatio =
+      (taperEnd - taperStart) /
+      (boreLength - taperStart + topPoint.borePosition);
+
+    return [taperRatio, taperStartRatio, taperLengthRatio];
+  }
+
+  setGeometryPoint(point: number[]): void {
+    if (point.length !== this.nrDimensions) {
+      throw new Error(
+        `Dimension mismatch: expected ${this.nrDimensions}, got ${point.length}`
+      );
+    }
+
+    const instrument = this.calculator.getInstrument();
+    const sortedBorePoints = getSortedBorePoints(instrument);
+
+    if (sortedBorePoints.length < 2) {
+      return;
+    }
+
+    const topPoint = sortedBorePoints[0]!;
+    const bottomPoint = sortedBorePoints[sortedBorePoints.length - 1]!;
+
+    const footDiameter = bottomPoint.boreDiameter;
+    const headDiameter = footDiameter * point[0]!;
+    const boreLength = bottomPoint.borePosition - topPoint.borePosition;
+    const taperStart = point[1]! * boreLength;
+    const taperLength = Math.max(
+      point[2]! * (boreLength - taperStart),
+      MINIMUM_CONE_LENGTH
+    );
+
+    // Create new bore points
+    const newBorePoints: typeof instrument.borePoint = [];
+
+    // Head point
+    newBorePoints.push({
+      borePosition: topPoint.borePosition,
+      boreDiameter: headDiameter,
+    });
+
+    // Taper start point (if taper doesn't start at head)
+    if (taperStart > 0) {
+      const taperStartPos = Math.min(
+        topPoint.borePosition + taperStart,
+        topPoint.borePosition + boreLength
+      );
+      newBorePoints.push({
+        borePosition: taperStartPos,
+        boreDiameter: headDiameter,
+      });
+    }
+
+    // Taper end point
+    const taperEnd = Math.min(
+      taperStart + taperLength,
+      boreLength
+    );
+    newBorePoints.push({
+      borePosition: topPoint.borePosition + taperEnd,
+      boreDiameter: footDiameter,
+    });
+
+    // Foot point (if taper doesn't end at foot)
+    if (taperStart + taperLength < boreLength) {
+      newBorePoints.push({
+        borePosition: topPoint.borePosition + boreLength,
+        boreDiameter: footDiameter,
+      });
+    }
+
+    instrument.borePoint = newBorePoints;
+  }
+
+  protected setConstraints(): void {
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperSimpleRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Bore diameter ratio (top/bottom)",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperSimpleRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Taper start (from top), fraction of bore length",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+    this.constraints.addConstraint(
+      createConstraint(
+        SingleTaperSimpleRatioObjectiveFunction.CONSTRAINT_CATEGORY,
+        "Taper length, fraction of bore below start",
+        ConstraintType.DIMENSIONLESS
+      )
+    );
+
+    this.constraints.setNumberOfHoles(
+      this.calculator.getInstrument().hole.length
+    );
+    this.constraints.setObjectiveDisplayName(
+      SingleTaperSimpleRatioObjectiveFunction.DISPLAY_NAME
+    );
+    this.constraints.setObjectiveFunctionName(
+      "SingleTaperSimpleRatioObjectiveFunction"
+    );
+    this.constraints.setConstraintsName("Default");
+
+    this.setDefaultBounds();
+  }
+
+  private setDefaultBounds(): void {
+    // Taper ratio: 0.8 to 1.3
+    // Taper start ratio: 0.0 to 0.5
+    // Taper length ratio: 0.2 to 1.0
+    this.lowerBounds = [0.8, 0.0, 0.2];
+    this.upperBounds = [1.3, 0.5, 1.0];
+    this.constraints.setLowerBounds(this.lowerBounds);
+    this.constraints.setUpperBounds(this.upperBounds);
+  }
+}
