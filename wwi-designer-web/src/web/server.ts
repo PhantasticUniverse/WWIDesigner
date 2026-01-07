@@ -41,90 +41,117 @@ function getSession(id: string) {
 
 // API handlers
 async function handleCalculateTuning(req: Request): Promise<Response> {
-  const body = await req.json();
-  const {
-    instrument,
-    tuning,
-    temperature = 20,
-    humidity = 45,
-    calculatorType = "auto" as CalculatorType,
-  } = body;
+  try {
+    const body = await req.json();
+    const {
+      instrument,
+      tuning,
+      temperature = 20,
+      humidity = 45,
+      calculatorType = "auto" as CalculatorType,
+    } = body;
 
-  if (!instrument || !tuning) {
-    return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
-  }
-
-  const params = new PhysicalParameters(temperature, "C", humidity);
-  // Use calculator factory with type detection or explicit type
-  const calc = createCalculator(instrument, params, calculatorType);
-  const tuner = new InstrumentTuner(calc);
-
-  const results = tuning.fingering.map((fingering: Fingering) => {
-    const targetFreq = fingering.note.frequency;
-    if (!targetFreq) {
-      return { note: fingering.note.name, error: "No target frequency" };
+    if (!instrument || !tuning) {
+      return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
     }
 
-    const predicted = tuner.predictedFrequency(fingering);
-    const deviation = 1200 * Math.log2(predicted / targetFreq);
+    if (!tuning.fingering || tuning.fingering.length === 0) {
+      return Response.json({ error: "Tuning has no fingerings" }, { status: 400 });
+    }
 
-    return {
-      note: fingering.note.name,
-      targetFrequency: targetFreq,
-      predictedFrequency: predicted,
-      deviationCents: deviation,
-    };
-  });
+    const params = new PhysicalParameters(temperature, "C", humidity);
+    // Use calculator factory with type detection or explicit type
+    const calc = createCalculator(instrument, params, calculatorType);
+    const tuner = new InstrumentTuner(calc);
 
-  return Response.json({ results });
+    const results = tuning.fingering.map((fingering: Fingering) => {
+      const note = fingering.note;
+      if (!note) {
+        return { note: "Unknown", error: "No note defined" };
+      }
+
+      const targetFreq = note.frequency;
+      if (!targetFreq) {
+        return { note: note.name || "Unknown", error: "No target frequency" };
+      }
+
+      try {
+        const predicted = tuner.predictedFrequency(fingering);
+        const deviation = 1200 * Math.log2(predicted / targetFreq);
+
+        return {
+          note: note.name || "Unknown",
+          targetFrequency: targetFreq,
+          predictedFrequency: predicted,
+          deviationCents: deviation,
+        };
+      } catch (calcError) {
+        return {
+          note: note.name || "Unknown",
+          targetFrequency: targetFreq,
+          error: `Calculation error: ${calcError}`
+        };
+      }
+    });
+
+    return Response.json({ results });
+  } catch (error) {
+    console.error("Calculate tuning error:", error);
+    return Response.json({ error: `Server error: ${error}` }, { status: 500 });
+  }
 }
 
 async function handleOptimize(req: Request): Promise<Response> {
-  const body = await req.json();
-  const {
-    instrument,
-    tuning,
-    optimizationType = "positions",
-    temperature = 20,
-    humidity = 45,
-    calculatorType = "auto" as CalculatorType,
-  } = body;
+  try {
+    const body = await req.json();
+    const {
+      instrument,
+      tuning,
+      optimizationType = "positions",
+      temperature = 20,
+      humidity = 45,
+      calculatorType = "auto" as CalculatorType,
+    } = body;
 
-  if (!instrument || !tuning) {
-    return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
+    if (!instrument || !tuning) {
+      return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
+    }
+
+    const params = new PhysicalParameters(temperature, "C", humidity);
+    // Use calculator factory with type detection or explicit type
+    const calc = createCalculator(instrument, params, calculatorType);
+    const evaluator = new CentDeviationEvaluator(calc);
+
+    let objective;
+    switch (optimizationType) {
+      case "sizes":
+        objective = new HoleSizeObjectiveFunction(calc, tuning, evaluator);
+        break;
+      case "both":
+        objective = new HoleObjectiveFunction(calc, tuning, evaluator);
+        break;
+      case "positions":
+      default:
+        objective = new HolePositionObjectiveFunction(calc, tuning, evaluator);
+        break;
+    }
+
+    const result = optimizeObjectiveFunction(objective, {
+      maxIterations: 1000,
+      tolerance: 1e-6,
+    });
+
+    return Response.json({
+      optimizedInstrument: objective.getInstrument(),
+      initialError: result.initialValue,
+      finalError: result.finalValue,
+      iterations: result.iterations,
+      converged: result.converged,
+    });
+  } catch (error) {
+    console.error("Optimize error:", error);
+    return Response.json({ error: `Server error: ${error}` }, { status: 500 });
   }
-
-  const params = new PhysicalParameters(temperature, "C", humidity);
-  // Use calculator factory with type detection or explicit type
-  const calc = createCalculator(instrument, params, calculatorType);
-  const evaluator = new CentDeviationEvaluator(calc);
-
-  let objective;
-  switch (optimizationType) {
-    case "sizes":
-      objective = new HoleSizeObjectiveFunction(calc, tuning, evaluator);
-      break;
-    case "both":
-      objective = new HoleObjectiveFunction(calc, tuning, evaluator);
-      break;
-    case "positions":
-    default:
-      objective = new HolePositionObjectiveFunction(calc, tuning, evaluator);
-      break;
-  }
-
-  const result = optimizeObjectiveFunction(objective, {
-    maxIterations: 1000,
-    tolerance: 1e-6,
-  });
-
-  return Response.json({
-    optimizedInstrument: objective.getInstrument(),
-    initialError: result.initialValue,
-    finalError: result.finalValue,
-    iterations: result.iterations,
-    converged: result.converged,
-  });
 }
 
 async function handleSketchData(req: Request): Promise<Response> {
