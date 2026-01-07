@@ -9,6 +9,7 @@ import { describe, test, expect } from "bun:test";
 import {
   MouthpieceCalculator,
   SimpleFippleMouthpieceCalculator,
+  DefaultFippleMouthpieceCalculator,
   FluteMouthpieceCalculator,
   getMouthpieceCalculator,
 } from "../../../src/core/geometry/mouthpiece-calculator.ts";
@@ -203,7 +204,7 @@ describe("MouthpieceCalculator", () => {
       };
 
       const calc = getMouthpieceCalculator(mouthpiece);
-      expect(calc).toBeInstanceOf(SimpleFippleMouthpieceCalculator);
+      expect(calc).toBeInstanceOf(DefaultFippleMouthpieceCalculator);
     });
 
     test("returns flute calculator for embouchure mouthpiece", () => {

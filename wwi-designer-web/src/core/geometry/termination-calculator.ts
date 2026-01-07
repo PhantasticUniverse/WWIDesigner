@@ -13,6 +13,7 @@
  * (at your option) any later version.
  */
 
+import { Complex } from "../math/complex.ts";
 import { StateVector } from "../math/state-vector.ts";
 import { PhysicalParameters } from "../physics/physical-parameters.ts";
 import { Tube } from "./tube.ts";
@@ -133,10 +134,93 @@ export class FlangedEndCalculator extends TerminationCalculator {
 }
 
 /**
+ * Termination calculator for thick flanged open ends.
+ *
+ * Ported from com.wwidesigner.geometry.calculation.ThickFlangedOpenEndCalculator
+ *
+ * This calculator uses a more sophisticated model that accounts for:
+ * - The ratio of bore diameter to flange diameter
+ * - Frequency-dependent reflection coefficient
+ *
+ * This is the termination calculator used by NAFCalculator in Java.
+ */
+export class ThickFlangedOpenEndCalculator extends TerminationCalculator {
+  /**
+   * Delta infinity constant for infinite flange.
+   */
+  private static readonly DELTA_INF = 0.8216;
+
+  /**
+   * Delta zero constant for zero flange (unflanged).
+   */
+  private static readonly DELTA_0 = 0.6133;
+
+  /**
+   * Calculate state vector for thick flanged termination.
+   */
+  calcStateVector(
+    termination: Termination,
+    isOpen: boolean,
+    waveNumber: number,
+    params: PhysicalParameters
+  ): StateVector {
+    if (!isOpen) {
+      return StateVector.ClosedEnd();
+    }
+
+    const Z = this.calcZ(termination, waveNumber, params).multiply(
+      params.calcZ0((termination.boreDiameter ?? 0.01) / 2)
+    );
+
+    return new StateVector(Z);
+  }
+
+  /**
+   * Calculate normalized impedance using reflection coefficient model.
+   *
+   * @param termination Termination parameters
+   * @param waveNumber Wave number k = 2*pi*f/c
+   * @param params Physical parameters
+   * @returns Normalized impedance Z/Z0
+   */
+  private calcZ(
+    termination: Termination,
+    waveNumber: number,
+    params: PhysicalParameters
+  ): Complex {
+    const a = (termination.boreDiameter ?? 0.01) / 2; // Bore radius
+    const b = termination.flangeDiameter / 2; // Flange radius
+
+    const a_b = a / b;
+    const ka = waveNumber * a;
+
+    // Calculate delta_circ interpolation between unflanged and infinite flange
+    const delta_circ =
+      ThickFlangedOpenEndCalculator.DELTA_INF +
+      a_b * (ThickFlangedOpenEndCalculator.DELTA_0 - ThickFlangedOpenEndCalculator.DELTA_INF) +
+      0.057 * a_b * (1 - Math.pow(a_b, 5));
+
+    // Calculate frequency-dependent reflection coefficient magnitude
+    const R0 =
+      (1 + 0.2 * ka - 0.084 * ka * ka) /
+      (1 + 0.2 * ka + (0.5 - 0.084) * ka * ka);
+
+    // Calculate complex reflection coefficient
+    // R = -R0 * exp(-2j * delta_circ * ka)
+    const phaseAngle = -2 * delta_circ * ka;
+    const R = new Complex(0, phaseAngle).exp().multiply(-R0);
+
+    // Convert reflection coefficient to impedance: Z = (1 + R) / (1 - R)
+    return R.add(1).divide(R.negate().add(1));
+  }
+}
+
+/**
  * Default termination calculator instances.
  */
 export const unflangedEndCalculator = new UnflangedEndCalculator();
 export const flangedEndCalculator = new FlangedEndCalculator();
+export const thickFlangedEndCalculator = new ThickFlangedOpenEndCalculator();
 
 /**
  * Get appropriate termination calculator based on flange diameter.

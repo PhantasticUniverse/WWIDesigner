@@ -452,10 +452,149 @@ export class FluteMouthpieceCalculator extends MouthpieceCalculator {
 }
 
 /**
+ * Mouthpiece calculation for a fipple mouthpiece, principally for NAFs.
+ *
+ * Ported from com.wwidesigner.geometry.calculation.DefaultFippleMouthpieceCalculator
+ *
+ * This calculator uses an admittance-based model with:
+ * - JYE: admittance from embouchure
+ * - JYC: admittance from headspace volume
+ * - Scaled fipple factor based on windway height
+ */
+export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
+  private static readonly DEFAULT_WINDWAY_HEIGHT = 0.00078740; // ~0.031 inches in meters
+  private static readonly AIR_GAMMA = 1.4018297351222222;
+
+  /**
+   * Calculate transfer matrix for fipple mouthpiece.
+   */
+  override calcTransferMatrix(
+    mouthpiece: Mouthpiece,
+    waveNumber: number,
+    params: PhysicalParameters
+  ): TransferMatrix {
+    if (isPressureNode(mouthpiece)) {
+      // Resort to default if this is not a flow-node mouthpiece.
+      return super.calcTransferMatrix(mouthpiece, waveNumber, params);
+    }
+
+    const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
+    const z0 = params.calcZ0(radius);
+    const omega = waveNumber * params.getSpeedOfSound();
+    const k_delta_l = this.calcKDeltaL(mouthpiece, omega, z0, params);
+
+    // Add a series resistance for radiation loss.
+    const freq = omega / (2 * Math.PI);
+    const r_rad = Tube.calcR(freq, radius, params);
+
+    const cos_kl = Math.cos(k_delta_l);
+    const sin_kl = Math.sin(k_delta_l);
+
+    const A = new Complex(cos_kl, r_rad * sin_kl / z0);
+    const B = new Complex(r_rad * cos_kl, sin_kl * z0);
+    const C = new Complex(0, sin_kl / z0);
+    const D = new Complex(cos_kl);
+
+    return new TransferMatrix(A, B, C, D);
+  }
+
+  /**
+   * Calculate k * delta_L for the mouthpiece.
+   */
+  private calcKDeltaL(
+    mouthpiece: Mouthpiece,
+    omega: number,
+    z0: number,
+    params: PhysicalParameters
+  ): number {
+    return Math.atan(1.0 / (z0 * (this.calcJYE(mouthpiece, omega) + this.calcJYC(mouthpiece, omega, params))));
+  }
+
+  /**
+   * Calculate imaginary admittance from embouchure.
+   */
+  private calcJYE(mouthpiece: Mouthpiece, omega: number): number {
+    const gamma = DefaultFippleMouthpieceCalculator.AIR_GAMMA;
+    const result = this.getCharacteristicLength(mouthpiece) / (gamma * omega);
+    return result;
+  }
+
+  /**
+   * Calculate imaginary admittance from headspace volume.
+   */
+  private calcJYC(mouthpiece: Mouthpiece, omega: number, params: PhysicalParameters): number {
+    const gamma = DefaultFippleMouthpieceCalculator.AIR_GAMMA;
+    const speedOfSound = params.getSpeedOfSound();
+    const v = 2.0 * this.calcHeadspaceVolume(mouthpiece);
+
+    const result = -(omega * v) / (gamma * speedOfSound * speedOfSound);
+    return result;
+  }
+
+  /**
+   * Calculate headspace volume.
+   * Uses mouthpiece position as a proxy for headspace.
+   */
+  private calcHeadspaceVolume(mouthpiece: Mouthpiece): number {
+    // Headspace is the volume above the splitting edge.
+    // Approximate as cylinder from position 0 to mouthpiece position.
+    const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
+    const length = mouthpiece.position;
+
+    // Multiply by 2.0 based on Java implementation comment:
+    // "Multiplier reset using a more accurate headspace representation"
+    return Math.PI * radius * radius * length * 2.0;
+  }
+
+  /**
+   * Get characteristic length for the fipple window.
+   */
+  private getCharacteristicLength(mouthpiece: Mouthpiece): number {
+    if (!mouthpiece.fipple) {
+      throw new Error("Fipple not defined for mouthpiece");
+    }
+
+    const windowLength = mouthpiece.fipple.windowLength;
+    const windowWidth = mouthpiece.fipple.windowWidth;
+    const fippleFactor = this.getScaledFippleFactor(mouthpiece);
+
+    const effectiveArea = windowLength * windowWidth;
+    const equivDiameter = 2.0 * Math.sqrt(effectiveArea / Math.PI) * fippleFactor;
+
+    return equivDiameter;
+  }
+
+  /**
+   * Get scaled fipple factor based on windway height.
+   */
+  private getScaledFippleFactor(mouthpiece: Mouthpiece): number {
+    let windwayHeight = mouthpiece.fipple?.windwayHeight;
+    if (windwayHeight === undefined || windwayHeight === null) {
+      windwayHeight = DefaultFippleMouthpieceCalculator.DEFAULT_WINDWAY_HEIGHT;
+    }
+
+    const ratio = Math.pow(
+      DefaultFippleMouthpieceCalculator.DEFAULT_WINDWAY_HEIGHT / windwayHeight,
+      1.0 / 3.0
+    );
+
+    let scaledFippleFactor: number;
+    if (mouthpiece.fipple?.fippleFactor === undefined || mouthpiece.fipple?.fippleFactor === null) {
+      scaledFippleFactor = ratio;
+    } else {
+      scaledFippleFactor = mouthpiece.fipple.fippleFactor * ratio;
+    }
+
+    return scaledFippleFactor;
+  }
+}
+
+/**
  * Default mouthpiece calculator instances.
  */
 export const defaultMouthpieceCalculator = new MouthpieceCalculator();
-export const defaultFippleCalculator = new SimpleFippleMouthpieceCalculator();
+export const simpleFippleCalculator = new SimpleFippleMouthpieceCalculator();
+export const defaultFippleCalculator = new DefaultFippleMouthpieceCalculator();
 export const defaultFluteCalculator = new FluteMouthpieceCalculator();
 
 /**
