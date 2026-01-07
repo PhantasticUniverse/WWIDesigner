@@ -330,7 +330,9 @@ import { createEvaluator, EvaluatorType } from "./optimization/evaluator.ts";
 const evaluator = createEvaluator("fminmax", calculator, tuner);
 ```
 
-## All Objective Functions (28 Implemented)
+## All Objective Functions (52 Implemented - 100% Java Parity)
+
+All objective functions from the Java WWIDesigner have been ported to TypeScript with identical behavior.
 
 ### Basic Hole Objectives
 
@@ -363,6 +365,14 @@ These optimize holes in groups where holes within each group maintain equal spac
 | `BoreDiameterFromTopObjectiveFunction` | P points | Bore diameter ratios from top |
 | `ConicalBoreObjectiveFunction` | 1 | Conical bore foot diameter |
 
+### Bore Position and Spacing Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `BorePositionObjectiveFunction` | P points | Relative bore point positions from bottom |
+| `BoreSpacingFromTopObjectiveFunction` | P points | Absolute bore point spacing from top |
+| `BoreFromBottomObjectiveFunction` | 2P | Position + diameter from bottom (merged) |
+
 ### Taper Objectives
 
 | Function | Dimensions | Description |
@@ -371,13 +381,59 @@ These optimize holes in groups where holes within each group maintain equal spac
 | `SingleTaperRatioObjectiveFunction` | 4 | Three-section taper with variable bore point count |
 | `SingleTaperSimpleRatioObjectiveFunction` | 3 | Three-section taper with simple ratio |
 
-### Combined Objectives
+### Hemispherical Head Objectives (NAF)
+
+For Native American Flutes with hemispherical bore tops:
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `SingleTaperSimpleRatioHemiHeadObjectiveFunction` | 3 | Taper with hemispherical head |
+| `SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction` | N + 3 | No-grouping + hemi-head (merged) |
+| `SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction` | G + N + 3 | Grouped holes + hemi-head (merged) |
+
+**Utility class:** `HemisphericalBoreHead` - Creates hemispherical bore profiles
+
+### Combined Hole + Bore Objectives
 
 | Function | Dimensions | Description |
 |----------|------------|-------------|
 | `HoleAndTaperObjectiveFunction` | 2N + 4 | Holes + single taper (merged) |
 | `HoleAndBoreDiameterFromTopObjectiveFunction` | 2N + P | Holes + bore diameters from top |
 | `HoleAndBoreDiameterFromBottomObjectiveFunction` | 2N + P | Holes + bore diameters from bottom |
+| `HoleAndBoreFromBottomObjectiveFunction` | 2N + 2P | Holes + bore position + diameter |
+| `HoleAndBorePositionObjectiveFunction` | 2N + P | Holes + bore position only |
+| `HoleAndBoreSpacingFromTopObjectiveFunction` | 2N + P | Holes + bore spacing from top |
+| `HoleAndConicalBoreObjectiveFunction` | 2N + 1 | Holes + conical bore (merged) |
+
+### Headjoint Objectives (Flute)
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `HeadjointObjectiveFunction` | 1 + P | Stopper position + bore diameters |
+| `HoleAndHeadjointObjectiveFunction` | 2N + P + 1 | Holes + headjoint (merged) |
+
+### Single Taper Merged Objectives
+
+| Function | Dimensions | Description |
+|----------|------------|-------------|
+| `SingleTaperNoHoleGroupingObjectiveFunction` | 2N + 3 | No hole grouping + taper (merged) |
+| `SingleTaperNoHoleGroupingFromTopObjectiveFunction` | 2N + 3 | From top + taper (merged) |
+| `SingleTaperHoleGroupObjectiveFunction` | G + N + 3 | Grouped holes + taper (merged) |
+| `SingleTaperHoleGroupFromTopObjectiveFunction` | G + N + 3 | Grouped from top + taper (merged) |
+
+### Global Optimizer Variants (DIRECT)
+
+These use the DIRECT global optimizer for more thorough exploration:
+
+| Function | Parent | Description |
+|----------|--------|-------------|
+| `GlobalHolePositionObjectiveFunction` | HolePosition | Global hole position search |
+| `GlobalHoleObjectiveFunction` | HoleObjective | Global hole position + size |
+| `GlobalHoleAndTaperObjectiveFunction` | HoleAndTaper | Global holes + taper |
+| `GlobalHoleAndBoreDiameterFromBottomObjectiveFunction` | HoleAndBoreDiameterFromBottom | Global holes + bore from bottom |
+| `GlobalHoleAndBoreDiameterFromTopObjectiveFunction` | HoleAndBoreDiameterFromTop | Global holes + bore from top |
+| `GlobalBoreFromBottomObjectiveFunction` | BoreFromBottom | Global bore from bottom |
+| `GlobalHoleAndBoreFromBottomObjectiveFunction` | HoleAndBoreFromBottom | Global holes + bore |
 
 ### Mouthpiece/Fipple Objectives
 
@@ -388,10 +444,12 @@ These optimize holes in groups where holes within each group maintain equal spac
 | `BetaObjectiveFunction` | 1 | Mouthpiece beta parameter |
 | `AirstreamLengthObjectiveFunction` | 1 | Window/airstream length |
 
-### Reed Objectives
+### Calibration Objectives
 
 | Function | Dimensions | Description |
 |----------|------------|-------------|
+| `FluteCalibrationObjectiveFunction` | 2 | Flute airstream length + beta |
+| `WhistleCalibrationObjectiveFunction` | 2 | Whistle window height + beta |
 | `ReedCalibratorObjectiveFunction` | 2 | Reed alpha + beta calibration |
 
 ### Flute Objectives

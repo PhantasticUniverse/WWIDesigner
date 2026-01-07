@@ -159,9 +159,12 @@ src/
 │   │   ├── instrument-tuner.ts       # Tuning prediction (Simple, LinearV)
 │   │   └── spectrum.ts               # Impedance/Reflectance spectrum
 │   └── optimization/
-│       ├── direct.ts                 # DIRECT algorithm
+│       ├── direct-optimizer.ts       # DIRECT algorithm
+│       ├── base-objective-function.ts # Base class for objectives
 │       ├── evaluator.ts              # Cent, Fmin, Fmax, Fminmax evaluators
-│       └── hole-position-objective.ts # Optimization objectives
+│       ├── constraints.ts            # Optimization constraints
+│       ├── hole-position-objective.ts # 52 objective functions (100% complete)
+│       └── objective-function-optimizer.ts # Optimizer orchestration
 ├── models/
 │   ├── instrument.ts             # Instrument geometry model
 │   └── tuning.ts                 # Tuning/fingering model
@@ -176,7 +179,8 @@ This implementation achieves **exact parity** with Java WWIDesigner:
 
 - All acoustic calculations match to 15+ significant digits
 - NAF tuning predictions: 1.41 cents average deviation (identical to Java)
-- 452 tests, including 68+ parity tests against Java output
+- 632 tests, including 68+ parity tests against Java output
+- All 52 objective functions ported (100% complete)
 
 Key Java classes and their TypeScript equivalents:
 
