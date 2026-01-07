@@ -94,7 +94,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **442 total tests**, 441 passing, 1 failing (BP7 Whistle edge case)
+- **442 total tests**, all passing ✅
 - **68+ parity tests** specifically for Java comparison
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
