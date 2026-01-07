@@ -383,3 +383,295 @@ export function calculateReflectanceSpectrum(
   spectrum.calcReflectance(calculator, freqStart, freqEnd, nfreq, fingering);
   return spectrum;
 }
+
+/**
+ * A point in a playing range spectrum with impedance and gain.
+ */
+export interface PlayingRangePoint {
+  frequency: number;
+  impedance: Complex;
+  loopGain: number | null;
+}
+
+/**
+ * Spectrum for analyzing playing range of an instrument.
+ *
+ * Includes impedance data (real and imaginary), loop gain estimation,
+ * and detection of loop gain maxima. Used for analyzing playability
+ * across a frequency range.
+ *
+ * Ported from com.wwidesigner.modelling.PlayingRangeSpectrum
+ */
+export class PlayingRangeSpectrum {
+  /** Name of the note/fingering being analyzed */
+  private name: string = "";
+
+  /** Actual frequencies (min/max if available, nominal otherwise) */
+  private actuals: number[] = [];
+
+  /** Whether actuals contains min/max (true) or nominal (false) */
+  private hasMinMax: boolean = false;
+
+  /** Harmonics of target or nominal frequency */
+  private harmonics: number[] = [];
+
+  /** Holds impedance spectrum data */
+  private impedance: Map<number, Complex> = new Map();
+
+  /** Holds loop gain spectrum data */
+  private gain: Map<number, number> = new Map();
+
+  /** Holds loop gain maxima */
+  private gainMaxima: Map<number, number> = new Map();
+
+  // State for finding loop gain maxima
+  private dataPointIndex: number = 0;
+  private prevFreq: number = 0;
+  private prevLoopGain: number = 0;
+  private prevPrevLoopGain: number = 0;
+
+  /**
+   * Add or replace a point in the spectrum.
+   */
+  private setDataPoint(
+    frequency: number,
+    impedance: Complex,
+    loopGain: number | null
+  ): void {
+    this.impedance.set(frequency, impedance);
+    if (loopGain !== null) {
+      this.gain.set(frequency, loopGain);
+      this.findLoopGainMaximum(frequency, loopGain);
+    }
+  }
+
+  /**
+   * Check for loop gain maximum at current point.
+   */
+  private findLoopGainMaximum(frequency: number, loopGain: number): void {
+    if (
+      this.dataPointIndex >= 2 &&
+      this.prevLoopGain > loopGain &&
+      this.prevLoopGain > this.prevPrevLoopGain
+    ) {
+      // We have found a loop gain maximum
+      this.gainMaxima.set(this.prevFreq, this.prevLoopGain);
+    }
+
+    this.dataPointIndex++;
+    this.prevPrevLoopGain = this.prevLoopGain;
+    this.prevLoopGain = loopGain;
+    this.prevFreq = frequency;
+  }
+
+  /**
+   * Calculate impedance and loop gain over a frequency range.
+   *
+   * @param calculator The instrument calculator
+   * @param fingering The fingering to use
+   * @param freqStart Starting frequency in Hz
+   * @param freqEnd Ending frequency in Hz
+   * @param nfreq Number of frequency points
+   */
+  calcSpectrum(
+    calculator: IInstrumentCalculator,
+    fingering: Fingering,
+    freqStart: number,
+    freqEnd: number,
+    nfreq: number
+  ): void {
+    // Reset state
+    this.dataPointIndex = 0;
+    this.prevFreq = 0;
+    this.prevLoopGain = 0;
+    this.prevPrevLoopGain = 0;
+
+    // Build name for this analysis
+    const myNote = fingering.note;
+    this.name = "Note";
+    const holeString = fingering.openHole
+      .map((o, i) => (o ? "O" : "X"))
+      .join("");
+    if (myNote?.name) {
+      this.name += ` ${myNote.name}`;
+      if (holeString) {
+        this.name += ` (${holeString})`;
+      }
+    } else {
+      this.name += ` ${holeString}`;
+    }
+
+    const instrName = calculator.getInstrument().name;
+    if (instrName) {
+      this.name += ` on ${instrName}`;
+    }
+
+    // Collect actual frequencies
+    this.actuals = [];
+    this.harmonics = [];
+    this.hasMinMax = false;
+
+    if (myNote?.frequencyMin !== undefined) {
+      this.actuals.push(myNote.frequencyMin);
+      this.hasMinMax = true;
+    }
+    if (myNote?.frequencyMax !== undefined) {
+      this.actuals.push(myNote.frequencyMax);
+      this.hasMinMax = true;
+    }
+    if (!this.hasMinMax && myNote?.frequency !== undefined) {
+      this.actuals.push(myNote.frequency);
+    }
+
+    // Build list of harmonics
+    if (myNote?.frequency !== undefined) {
+      const freqTarget = myNote.frequency;
+      let freqHarmonic = 2.0 * freqTarget;
+      while (freqHarmonic <= freqEnd) {
+        this.harmonics.push(freqHarmonic);
+        freqHarmonic += freqTarget;
+      }
+    }
+
+    // Reset collections
+    this.impedance = new Map();
+    this.gain = new Map();
+    this.gainMaxima = new Map();
+
+    const freqStep = (freqEnd - freqStart) / (nfreq - 1);
+    for (let i = 0; i < nfreq; i++) {
+      const freq = freqStart + i * freqStep;
+      const zAc = calculator.calcZ(freq, fingering);
+      const loopGain = calculator.calcGain(freq, zAc);
+      this.setDataPoint(freq, zAc, loopGain);
+    }
+  }
+
+  /**
+   * Get the name of this analysis.
+   */
+  getName(): string {
+    return this.name;
+  }
+
+  /**
+   * Get actual frequencies (min/max or nominal).
+   */
+  getActuals(): number[] {
+    return this.actuals;
+  }
+
+  /**
+   * Check if actuals contains min/max frequencies.
+   */
+  hasMinMaxFrequencies(): boolean {
+    return this.hasMinMax;
+  }
+
+  /**
+   * Get harmonics of target frequency.
+   */
+  getHarmonics(): number[] {
+    return this.harmonics;
+  }
+
+  /**
+   * Get the impedance spectrum data.
+   */
+  getImpedance(): Map<number, Complex> {
+    return this.impedance;
+  }
+
+  /**
+   * Get the loop gain spectrum data.
+   */
+  getGain(): Map<number, number> {
+    return this.gain;
+  }
+
+  /**
+   * Get loop gain maxima.
+   */
+  getGainMaxima(): Map<number, number> {
+    return this.gainMaxima;
+  }
+
+  /**
+   * Get impedance ratio (Im/Re) at each frequency.
+   */
+  getImpedanceRatio(): Map<number, number> {
+    const ratio = new Map<number, number>();
+    for (const [freq, z] of this.impedance) {
+      ratio.set(freq, z.im / z.re);
+    }
+    return ratio;
+  }
+
+  /**
+   * Get all data as an array of points sorted by frequency.
+   */
+  getSpectrumPoints(): PlayingRangePoint[] {
+    const points: PlayingRangePoint[] = [];
+    for (const [frequency, impedance] of this.impedance) {
+      points.push({
+        frequency,
+        impedance,
+        loopGain: this.gain.get(frequency) ?? null,
+      });
+    }
+    return points.sort((a, b) => a.frequency - b.frequency);
+  }
+
+  /**
+   * Get data for plotting: frequencies, real impedance, imaginary impedance,
+   * impedance ratio (Im/Re), and loop gain.
+   */
+  getPlotData(): {
+    frequencies: number[];
+    real: number[];
+    imag: number[];
+    ratio: number[];
+    gain: number[];
+    gainHigh: number[];  // gain >= 1
+    gainLow: number[];   // gain < 1
+  } {
+    const points = this.getSpectrumPoints();
+    return {
+      frequencies: points.map((p) => p.frequency),
+      real: points.map((p) => p.impedance.re),
+      imag: points.map((p) => p.impedance.im),
+      ratio: points.map((p) => p.impedance.im / p.impedance.re),
+      gain: points.map((p) => p.loopGain ?? 0),
+      gainHigh: points.map((p) => (p.loopGain !== null && p.loopGain >= 1 ? p.loopGain : NaN)),
+      gainLow: points.map((p) => (p.loopGain !== null && p.loopGain < 1 ? p.loopGain : NaN)),
+    };
+  }
+}
+
+/**
+ * Convenience function to calculate playing range spectrum.
+ */
+export function calculatePlayingRangeSpectrum(
+  calculator: IInstrumentCalculator,
+  fingering: Fingering,
+  freqRangeBelow: number = 0.5,
+  freqRangeAbove: number = 2.0,
+  nfreq: number = 2000
+): PlayingRangeSpectrum {
+  // Determine target frequency
+  let targetFreq: number;
+  if (fingering.note?.frequency !== undefined) {
+    targetFreq = fingering.note.frequency;
+  } else if (fingering.note?.frequencyMax !== undefined) {
+    targetFreq = fingering.note.frequencyMax;
+  } else {
+    targetFreq = 1000.0;
+  }
+
+  const freqStart = targetFreq * freqRangeBelow;
+  const freqEnd = targetFreq * freqRangeAbove;
+
+  const spectrum = new PlayingRangeSpectrum();
+  spectrum.calcSpectrum(calculator, fingering, freqStart, freqEnd, nfreq);
+  return spectrum;
+}

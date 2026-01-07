@@ -453,9 +453,115 @@ export class FminmaxEvaluator extends BaseEvaluator {
 }
 
 /**
+ * Evaluator for the bell note (lowest note with all holes closed).
+ *
+ * Returns the signed reactance at the target fmax (FmaxRatio * fnom),
+ * only for notes with all holes closed.
+ *
+ * Ported from com.wwidesigner.modelling.BellNoteEvaluator
+ */
+export class BellNoteEvaluator implements IEvaluator {
+  private calculator: IInstrumentCalculator;
+
+  /** Aim for fmax slightly greater than nominal frequency */
+  private static readonly FMAX_RATIO = 1.001;
+
+  constructor(calculator: IInstrumentCalculator) {
+    this.calculator = calculator;
+  }
+
+  /**
+   * Check if all holes are closed for a fingering.
+   */
+  private static allHolesClosed(fingering: Fingering): boolean {
+    for (const isOpen of fingering.openHole) {
+      if (isOpen) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Calculate reactance at FmaxRatio * fnom for all-holes-closed notes.
+   */
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    const errorVector: number[] = new Array(fingeringTargets.length);
+
+    for (let i = 0; i < fingeringTargets.length; i++) {
+      const target = fingeringTargets[i]!;
+
+      if (
+        !BellNoteEvaluator.allHolesClosed(target) ||
+        target.note?.frequency === undefined
+      ) {
+        errorVector[i] = 0.0;
+      } else {
+        const fmax = BellNoteEvaluator.FMAX_RATIO * target.note.frequency;
+        const Z = this.calculator.calcZ(fmax, target);
+        errorVector[i] = Z.im;
+      }
+    }
+
+    return errorVector;
+  }
+}
+
+/**
+ * Evaluator based on the phase of the reflection coefficient.
+ *
+ * Returns the signed phase angle of the complex reflection coefficient
+ * at the instrument's target frequency. Multiplies by -1 so that
+ * reflectance of -1 has phase angle of zero.
+ *
+ * Ported from com.wwidesigner.modelling.ReflectionEvaluator
+ */
+export class ReflectionEvaluator implements IEvaluator {
+  private calculator: IInstrumentCalculator;
+
+  constructor(calculator: IInstrumentCalculator) {
+    this.calculator = calculator;
+  }
+
+  /**
+   * Calculate phase angle of reflection coefficient at target frequencies.
+   */
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    const errorVector: number[] = new Array(fingeringTargets.length);
+
+    for (let i = 0; i < fingeringTargets.length; i++) {
+      const target = fingeringTargets[i]!;
+
+      if (target.note?.frequency === undefined) {
+        errorVector[i] = 0.0;
+      } else {
+        // Calculate reflection coefficient
+        const reflectionCoeff = this.calculator.calcReflectionCoefficient(
+          target.note.frequency,
+          target
+        );
+        // Multiply by -1, so that reflectance of -1 has phase angle of zero
+        const negRefl = reflectionCoeff.neg();
+        errorVector[i] = negRefl.arg();
+      }
+    }
+
+    return errorVector;
+  }
+}
+
+/**
  * Supported evaluator types.
  */
-export type EvaluatorType = "cents" | "frequency" | "reactance" | "fmin" | "fmax" | "fminmax";
+export type EvaluatorType =
+  | "cents"
+  | "frequency"
+  | "reactance"
+  | "fmin"
+  | "fmax"
+  | "fminmax"
+  | "bellnote"
+  | "reflection";
 
 /**
  * Factory function to create an evaluator of a given type.
@@ -478,6 +584,10 @@ export function createEvaluator(
       return new FmaxEvaluator(calculator, tuner);
     case "fminmax":
       return new FminmaxEvaluator(calculator, tuner);
+    case "bellnote":
+      return new BellNoteEvaluator(calculator);
+    case "reflection":
+      return new ReflectionEvaluator(calculator);
     default:
       return new CentDeviationEvaluator(calculator, tuner);
   }

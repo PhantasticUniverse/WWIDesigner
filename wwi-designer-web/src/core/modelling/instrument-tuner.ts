@@ -608,3 +608,217 @@ export function createLinearVTuner(
   const calculator = new DefaultInstrumentCalculator(instrument, physicalParams);
   return new LinearVInstrumentTuner(instrument, tuning, calculator, physicalParams, blowingLevel);
 }
+
+/**
+ * InstrumentTuner for calculators that predict minimum and maximum
+ * frequencies of a playing range. Predicts nominal frequency from
+ * a nominal playing pattern of an instrument (how the player would
+ * expect to play each note).
+ *
+ * For the nominal playing pattern, we use a linear change in
+ * reactance from just below fmax for the lowest note,
+ * to somewhat above fmin for the highest note.
+ * This is only *one* possible playing pattern, and has not yet been
+ * validated against the playing of real players.
+ *
+ * Ported from com.wwidesigner.modelling.LinearXInstrumentTuner
+ */
+export class LinearXInstrumentTuner extends InstrumentTuner {
+  // Target reactance of lowest note is BottomFraction of its value at fmin.
+  // Target reactance of highest note is TopFraction of its value at fmin.
+  protected bottomFraction: number;
+  protected topFraction: number;
+
+  // Standard ranges for BottomFraction and TopFraction
+  private static readonly BOTTOM_LO = 0.30;
+  private static readonly BOTTOM_HI = 0.02;
+  private static readonly TOP_LO = 0.95;
+  private static readonly TOP_HI = 0.20;
+
+  protected fLow: number = 100.0;   // Lowest frequency in target range
+  protected fHigh: number = 100.0;  // Highest frequency in target range
+  // Linear equation parameters for calculating nominal reactance:
+  // Xnom = slope * f + intercept
+  protected slope: number = 0.0;
+  protected intercept: number = 0.0;
+
+  constructor(
+    instrument: Instrument,
+    tuning: Tuning,
+    calculator: IInstrumentCalculator,
+    params: PhysicalParameters,
+    blowingLevel: number = 5
+  ) {
+    super(instrument, tuning, calculator, params);
+    // Interpolate between Low and Hi values, depending on blowing level
+    // For bottom note, we want to stick close to BottomHi, except at
+    // the lowest blowing levels
+    // For top note, we use linear interpolation between TopLo and TopHi
+    this.bottomFraction = LinearXInstrumentTuner.BOTTOM_HI -
+      ((10 - blowingLevel) * (10 - blowingLevel)) * 0.01 *
+      (LinearXInstrumentTuner.BOTTOM_HI - LinearXInstrumentTuner.BOTTOM_LO);
+    this.topFraction = LinearXInstrumentTuner.TOP_LO +
+      blowingLevel * 0.1 *
+      (LinearXInstrumentTuner.TOP_HI - LinearXInstrumentTuner.TOP_LO);
+
+    if (tuning.fingering.length > 0) {
+      this.setFingering(tuning.fingering);
+    }
+  }
+
+  /**
+   * Set interpolation parameters to interpolate reactance
+   * for a specified set of fingering targets.
+   * Following this call, use getNominalX() to return interpolated reactance.
+   */
+  protected setFingering(fingeringTargets: Fingering[]): void {
+    // Get lowest and highest target notes, and estimate a target reactance for each
+    this.fLow = 100000.0;
+    this.fHigh = 0.0;
+    // Target reactance for lowest and highest notes
+    let xLow = 0.0;
+    let xHigh = 0.0;
+
+    // Find lowest and highest target notes
+    let noteLow: Fingering | null = null;
+    let noteHigh: Fingering | null = null;
+
+    for (const target of fingeringTargets) {
+      if (target.note) {
+        const freq = target.note.frequency ?? target.note.frequencyMax;
+        if (freq !== undefined) {
+          if (freq < this.fLow) {
+            this.fLow = freq;
+            noteLow = { ...target };
+          }
+          if (freq > this.fHigh) {
+            this.fHigh = freq;
+            noteHigh = { ...target };
+          }
+        }
+      }
+    }
+
+    if (!noteLow || !noteHigh) {
+      return;
+    }
+
+    // Locate playing ranges at fLow and fHigh,
+    // and calculate nominal reactance at these frequencies from Im(Z(fmin)).
+    // This nominal reactance is actually an interpolation between
+    // Im(Z(fmin)) and Im(Z(fmax)), assuming that Im(Z(fmax)) is always zero.
+    const range = new PlayingRange(this.calculator, noteLow);
+    try {
+      const fmax = range.findXZero(this.fLow);
+      const fmin = range.findFmin(fmax);
+      const z = this.calculator.calcZ(fmin, noteLow);
+      xLow = this.bottomFraction * z.im;
+      this.fLow = fmax; // Nominal frequency for our interpolation
+    } catch {
+      xLow = 0.0;
+    }
+
+    range.setFingering(noteHigh);
+    try {
+      const fmax = range.findXZero(this.fHigh);
+      const fmin = range.findFmin(fmax);
+      const z = this.calculator.calcZ(fmin, noteHigh);
+      xHigh = this.topFraction * z.im;
+      this.fHigh = fmax; // Nominal frequency for our interpolation
+    } catch {
+      xHigh = -1.0e6; // Arbitrary line-in-the-sand
+    }
+
+    // Nominal reactance is a linear interpolation between (fLow,xLow) and (fHigh,xHigh)
+    // xNom = slope * frequency + intercept
+    if (this.fHigh !== this.fLow) {
+      this.slope = (xHigh - xLow) / (this.fHigh - this.fLow);
+      this.intercept = xLow - this.slope * this.fLow;
+    } else {
+      this.slope = 0;
+      this.intercept = xLow;
+    }
+  }
+
+  /**
+   * Following a call to setFingering(), return interpolated reactance.
+   * @param f Frequency
+   * @returns Nominal reactance at specified frequency
+   */
+  public getNominalX(f: number): number {
+    return this.slope * f + this.intercept;
+  }
+
+  /**
+   * Predict the nominal playing frequency.
+   */
+  predictedFrequency(fingering: Fingering): number | null {
+    const targetNote = fingering.note;
+    const target = this.getFrequencyTarget(targetNote);
+    if (target === 0) return null;
+
+    const range = new PlayingRange(this.calculator, fingering);
+    try {
+      const reactance = this.getNominalX(target);
+      return range.findX(target, reactance);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Predict the played note with fmin, fmax, and nominal frequency.
+   */
+  predictedNote(fingering: Fingering): Note {
+    const targetNote = fingering.note;
+    const predNote: Note = {
+      name: targetNote?.name,
+    };
+
+    const target = this.getFrequencyTarget(targetNote);
+    if (target === 0) {
+      return predNote;
+    }
+
+    // Predict playing range
+    const range = new PlayingRange(this.calculator, fingering);
+    try {
+      const fmax = range.findXZero(target);
+      predNote.frequencyMax = fmax;
+      const fmin = range.findFmin(fmax);
+      predNote.frequencyMin = fmin;
+    } catch {
+      // Leave fmax and fmin unassigned
+    }
+
+    try {
+      const fnom = range.findX(target, this.getNominalX(target));
+      predNote.frequency = fnom;
+    } catch {
+      // Leave fnom unassigned
+    }
+
+    return predNote;
+  }
+
+  override setTuning(tuning: Tuning): void {
+    super.setTuning(tuning);
+    if (tuning && tuning.fingering.length > 0) {
+      this.setFingering(tuning.fingering);
+    }
+  }
+}
+
+/**
+ * Create a LinearX instrument tuner.
+ */
+export function createLinearXTuner(
+  instrument: Instrument,
+  tuning: Tuning,
+  params?: PhysicalParameters,
+  blowingLevel: number = 5
+): LinearXInstrumentTuner {
+  const physicalParams = params ?? new PhysicalParameters();
+  const calculator = new DefaultInstrumentCalculator(instrument, physicalParams);
+  return new LinearXInstrumentTuner(instrument, tuning, calculator, physicalParams, blowingLevel);
+}

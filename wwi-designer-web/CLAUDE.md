@@ -116,22 +116,22 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] Mouthpiece visualization (fipple window rectangle, embouchure oval)
 - [x] Windway dashed rectangle display
 
-#### Phase 9: Advanced Evaluators (Partial - 5/8 Complete)
+#### Phase 9: Advanced Evaluators (7/8 Complete)
 - [x] FminEvaluator - First minimum frequency detection
 - [x] FmaxEvaluator - First maximum frequency detection
 - [x] FminmaxEvaluator - Combined min/max evaluation
-- [ ] BellNoteEvaluator - Playing range analysis
-- [ ] ReflectionEvaluator - Reflection coefficient analysis
-- [ ] WhistleEvaluator - Whistle-specific evaluation
+- [x] BellNoteEvaluator - Bell note (all holes closed) optimization
+- [x] ReflectionEvaluator - Reflection coefficient phase analysis
+- [ ] WhistleEvaluator - Whistle-specific evaluation (requires WhistleCalculator)
 
 #### Phase 11: Spectrum Analysis (Complete)
 - [x] ImpedanceSpectrum - Impedance magnitude vs frequency
 - [x] ReflectanceSpectrum - Reflection coefficient spectrum
-- [ ] PlayingRangeSpectrum - Playable frequency analysis
+- [x] PlayingRangeSpectrum - Impedance ratio and loop gain analysis
 
-#### Phase 13: Advanced Tuners (Partial - 1/2 Complete)
-- [x] LinearVInstrumentTuner - Volume-based linear tuner
-- [ ] LinearXInstrumentTuner - Position-based linear tuner
+#### Phase 13: Advanced Tuners (Complete)
+- [x] LinearVInstrumentTuner - Velocity-based linear tuner
+- [x] LinearXInstrumentTuner - Reactance-based linear tuner
 
 ### Remaining Features (~60% Remaining)
 
@@ -167,10 +167,10 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 | Mouthpiece Calculators | 4 | 4 | 100% |
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
-| Evaluators | 8 | 5 | 63% |
+| Evaluators | 8 | 7 | 88% |
 | Objective Functions | 55 | 2 | 4% |
-| Tuners | 5 | 4 | 80% |
-| Spectrum Analyzers | 3 | 2 | 67% |
+| Tuners | 5 | 5 | 100% |
+| Spectrum Analyzers | 3 | 3 | 100% |
 | Study Models | 4 | 0 | 0% |
 
 ### Priority Queue
