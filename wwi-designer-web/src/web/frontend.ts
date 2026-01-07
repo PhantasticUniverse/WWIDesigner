@@ -162,11 +162,12 @@ function createInstrumentEditor(instrument: Instrument, id: string): string {
 
       <!-- Bore Profile -->
       <div class="editor-section">
-        <h3>Bore Profile</h3>
+        <h3>Bore Points</h3>
         <div class="bore-table-container">
           <table class="data-table bore-table" id="bore-table-${tabId}">
             <thead>
               <tr>
+                <th>Name</th>
                 <th>Position</th>
                 <th>Diameter</th>
                 <th></th>
@@ -177,8 +178,9 @@ function createInstrumentEditor(instrument: Instrument, id: string): string {
                 .map(
                   (bp, i) => `
                 <tr data-index="${i}">
-                  <td><input type="number" step="0.1" value="${bp.borePosition}" data-field="borePosition" /></td>
-                  <td><input type="number" step="0.1" value="${bp.boreDiameter}" data-field="boreDiameter" /></td>
+                  <td><input type="text" value="${bp.name || ""}" data-field="name" style="width:60px" placeholder="optional" /></td>
+                  <td><input type="number" step="0.01" value="${bp.borePosition}" data-field="borePosition" /></td>
+                  <td><input type="number" step="0.01" value="${bp.boreDiameter}" data-field="boreDiameter" /></td>
                   <td><button class="btn-icon" data-remove-bore="${i}">&times;</button></td>
                 </tr>
               `
@@ -197,8 +199,9 @@ function createInstrumentEditor(instrument: Instrument, id: string): string {
           <table class="data-table hole-table" id="hole-table-${tabId}">
             <thead>
               <tr>
-                <th>#</th>
+                <th>Name</th>
                 <th>Position</th>
+                <th>Spacing</th>
                 <th>Diameter</th>
                 <th>Height</th>
                 <th></th>
@@ -206,17 +209,21 @@ function createInstrumentEditor(instrument: Instrument, id: string): string {
             </thead>
             <tbody>
               ${(instrument.hole || [])
-                .map(
-                  (h, i) => `
+                .map((h, i, arr) => {
+                  const prevPos = i > 0 ? arr[i - 1]?.position || 0 : 0;
+                  const spacing = i > 0 ? (h.position - prevPos).toFixed(2) : "";
+                  const holeName = h.name || `Hole ${arr.length - i}`;
+                  return `
                 <tr data-index="${i}">
-                  <td>${i + 1}</td>
-                  <td><input type="number" step="0.1" value="${h.position}" data-field="position" /></td>
-                  <td><input type="number" step="0.1" value="${h.diameter}" data-field="diameter" /></td>
-                  <td><input type="number" step="0.1" value="${h.height || 3}" data-field="height" /></td>
+                  <td><input type="text" value="${holeName}" data-field="name" style="width:70px" /></td>
+                  <td><input type="number" step="0.01" value="${h.position}" data-field="position" /></td>
+                  <td class="spacing-cell">${spacing}</td>
+                  <td><input type="number" step="0.01" value="${h.diameter}" data-field="diameter" /></td>
+                  <td><input type="number" step="0.01" value="${h.height || 3}" data-field="height" /></td>
                   <td><button class="btn-icon" data-remove-hole="${i}">&times;</button></td>
                 </tr>
-              `
-                )
+              `;
+                })
                 .join("")}
             </tbody>
           </table>
@@ -254,8 +261,8 @@ function renderMouthpieceEditor(instrument: Instrument, tabId: string): string {
   return `
     <div class="form-row">
       <div class="form-group">
-        <label>Position</label>
-        <input type="number" step="0.1" id="mp-position-${tabId}" value="${mp.position || 0}" />
+        <label>Splitting-edge Position</label>
+        <input type="number" step="0.01" id="mp-position-${tabId}" value="${mp.position || 0}" />
       </div>
       <div class="form-group">
         <label>Type</label>
@@ -272,30 +279,22 @@ function renderMouthpieceEditor(instrument: Instrument, tabId: string): string {
     <div id="fipple-config-${tabId}">
       <div class="form-row">
         <div class="form-group">
-          <label>Window Width</label>
-          <input type="number" step="0.01" id="fipple-width-${tabId}" value="${mp.fipple?.windowWidth || 10}" />
-        </div>
-        <div class="form-group">
-          <label>Window Length</label>
+          <label>TSH Length</label>
           <input type="number" step="0.01" id="fipple-length-${tabId}" value="${mp.fipple?.windowLength || 8}" />
         </div>
         <div class="form-group">
-          <label>Window Height</label>
-          <input type="number" step="0.01" id="fipple-height-${tabId}" value="${mp.fipple?.windowHeight || ""}" placeholder="optional" />
+          <label>TSH Width</label>
+          <input type="number" step="0.01" id="fipple-width-${tabId}" value="${mp.fipple?.windowWidth || 10}" />
         </div>
       </div>
       <div class="form-row" id="naf-params-${tabId}" style="${isNAF ? "" : "display:none"}">
         <div class="form-group">
-          <label>Fipple Factor</label>
-          <input type="number" step="0.01" id="fipple-factor-${tabId}" value="${mp.fipple?.fippleFactor ?? 1.0}" />
-        </div>
-        <div class="form-group">
-          <label>Windway Height</label>
+          <label>Flue Depth</label>
           <input type="number" step="0.001" id="windway-height-${tabId}" value="${mp.fipple?.windwayHeight || ""}" placeholder="optional" />
         </div>
         <div class="form-group">
-          <label>Windway Length</label>
-          <input type="number" step="0.01" id="windway-length-${tabId}" value="${mp.fipple?.windwayLength || ""}" placeholder="optional" />
+          <label>Fipple Factor</label>
+          <input type="number" step="0.00001" id="fipple-factor-${tabId}" value="${mp.fipple?.fippleFactor ?? 1.0}" />
         </div>
       </div>
     </div>
@@ -512,10 +511,12 @@ function updateInstrumentFromEditor(tabId: string, instrumentId: string) {
   if (boreTable) {
     inst.borePoint = [];
     boreTable.querySelectorAll("tbody tr").forEach((row) => {
+      const nameInput = row.querySelector<HTMLInputElement>('[data-field="name"]');
       const posInput = row.querySelector<HTMLInputElement>('[data-field="borePosition"]');
       const diaInput = row.querySelector<HTMLInputElement>('[data-field="boreDiameter"]');
       if (posInput && diaInput) {
         inst.borePoint!.push({
+          name: nameInput?.value || undefined,
           borePosition: parseFloat(posInput.value),
           boreDiameter: parseFloat(diaInput.value),
         });
@@ -528,11 +529,13 @@ function updateInstrumentFromEditor(tabId: string, instrumentId: string) {
   if (holeTable) {
     inst.hole = [];
     holeTable.querySelectorAll("tbody tr").forEach((row) => {
+      const nameInput = row.querySelector<HTMLInputElement>('[data-field="name"]');
       const posInput = row.querySelector<HTMLInputElement>('[data-field="position"]');
       const diaInput = row.querySelector<HTMLInputElement>('[data-field="diameter"]');
       const heightInput = row.querySelector<HTMLInputElement>('[data-field="height"]');
       if (posInput && diaInput && heightInput) {
         inst.hole!.push({
+          name: nameInput?.value || undefined,
           position: parseFloat(posInput.value),
           diameter: parseFloat(diaInput.value),
           height: parseFloat(heightInput.value),
