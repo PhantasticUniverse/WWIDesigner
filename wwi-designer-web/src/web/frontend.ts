@@ -6,6 +6,7 @@
 
 import type { Instrument, BorePoint, Hole } from "../models/instrument.ts";
 import type { Tuning, Fingering } from "../models/tuning.ts";
+import { parseInstrument, parseTuning } from "../utils/xml-converter.ts";
 
 // Application State
 interface AppState {
@@ -479,14 +480,14 @@ function createTuningEditor(tuning: Tuning, id: string): string {
                 .map(
                   (f, i) => `
                 <tr data-index="${i}">
-                  <td><input type="text" value="${f.note.name || ""}" data-field="noteName" /></td>
-                  <td><input type="number" step="0.1" value="${f.note.frequency || ""}" data-field="frequency" /></td>
+                  <td><input type="text" value="${f.note?.name || ""}" data-field="noteName" /></td>
+                  <td><input type="number" step="0.1" value="${f.note?.frequency || ""}" data-field="frequency" /></td>
                   <td>
                     <div class="fingering-pattern" data-fingering="${i}">
                       ${renderFingeringPattern(f.openHole, numHoles, i)}
                     </div>
                   </td>
-                  <td><input type="number" step="0.1" value="${f.note.weight || 1}" data-field="weight" style="width:60px" /></td>
+                  <td><input type="number" step="0.1" value="${f.optimizationWeight ?? 1}" data-field="weight" style="width:60px" /></td>
                   <td><button class="btn-icon" data-remove-fingering="${i}">&times;</button></td>
                 </tr>
               `
@@ -547,8 +548,9 @@ function bindTuningEditorEvents(tabId: string, tuningId: string, numHoles: numbe
     if (!tuning) return;
     tuning.fingering = tuning.fingering || [];
     tuning.fingering.push({
-      note: { name: "", frequency: 0 },
+      note: { name: "", frequency: undefined },
       openHole: new Array(numHoles).fill(false),
+      optimizationWeight: 1,
     });
     createTuningEditor(tuning, tuningId);
   });
@@ -591,12 +593,17 @@ function updateTuningFromEditor(tabId: string, tuningId: string) {
   if (fingeringTable) {
     fingeringTable.querySelectorAll("tbody tr").forEach((row, i) => {
       if (!tuning.fingering || !tuning.fingering[i]) return;
+      const fingering = tuning.fingering[i];
+      // Ensure note exists
+      if (!fingering.note) {
+        fingering.note = { name: "", frequency: undefined };
+      }
       const nameInput = row.querySelector<HTMLInputElement>('[data-field="noteName"]');
       const freqInput = row.querySelector<HTMLInputElement>('[data-field="frequency"]');
       const weightInput = row.querySelector<HTMLInputElement>('[data-field="weight"]');
-      if (nameInput) tuning.fingering[i].note.name = nameInput.value;
-      if (freqInput) tuning.fingering[i].note.frequency = parseFloat(freqInput.value);
-      if (weightInput) tuning.fingering[i].note.weight = parseFloat(weightInput.value);
+      if (nameInput) fingering.note.name = nameInput.value;
+      if (freqInput) fingering.note.frequency = parseFloat(freqInput.value) || undefined;
+      if (weightInput) fingering.optimizationWeight = parseFloat(weightInput.value) || 1;
     });
   }
 }
@@ -1340,95 +1347,54 @@ function downloadFile(filename: string, content: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-function importXMLFile() {
+function importInstrumentFile() {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".xml";
+  input.accept = ".xml,.json";
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
 
     try {
       const text = await file.text();
-      const instrument = parseInstrumentXML(text);
+      const instrument = parseInstrument(text);
       const id = `imported-${Date.now()}`;
       state.instruments.set(id, instrument);
       state.selectedInstrument = id;
       updateSidebar();
       createInstrumentEditor(instrument, id);
-      log(`Imported ${instrument.name || "instrument"} from XML`, "success");
+      log(`Imported ${instrument.name || "instrument"} (${instrument.hole?.length || 0} holes)`, "success");
     } catch (error) {
-      log(`Failed to import XML: ${error}`, "error");
+      log(`Failed to import instrument: ${error}`, "error");
     }
   };
   input.click();
 }
 
-function parseInstrumentXML(xml: string): Instrument {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, "application/xml");
+function importTuningFile() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".xml,.json";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
 
-  const getTextContent = (parent: Element, tag: string) => parent.querySelector(tag)?.textContent || "";
-  const getNumber = (parent: Element, tag: string) => parseFloat(getTextContent(parent, tag)) || 0;
-
-  const instrument: Instrument = {
-    name: getTextContent(doc.documentElement, "name"),
-    lengthType: (getTextContent(doc.documentElement, "lengthType") as "MM" | "IN") || "MM",
-    mouthpiece: { position: 0 },
-    borePoint: [],
-    hole: [],
-    termination: { flangeDiameter: 0 },
+    try {
+      const text = await file.text();
+      const tuning = parseTuning(text);
+      const id = `imported-tuning-${Date.now()}`;
+      state.tunings.set(id, tuning);
+      state.selectedTuning = id;
+      updateSidebar();
+      createTuningEditor(tuning, id);
+      log(`Imported ${tuning.name || "tuning"} (${tuning.fingering?.length || 0} fingerings)`, "success");
+    } catch (error) {
+      log(`Failed to import tuning: ${error}`, "error");
+    }
   };
-
-  // Mouthpiece
-  const mpElement = doc.querySelector("mouthpiece");
-  if (mpElement) {
-    instrument.mouthpiece.position = getNumber(mpElement, "position");
-    const fipple = mpElement.querySelector("fipple");
-    if (fipple) {
-      instrument.mouthpiece.fipple = {
-        windowWidth: getNumber(fipple, "windowWidth"),
-        windowLength: getNumber(fipple, "windowLength"),
-        windowHeight: getNumber(fipple, "windowHeight"),
-      };
-    }
-    const embouchure = mpElement.querySelector("embouchureHole");
-    if (embouchure) {
-      instrument.mouthpiece.embouchureHole = {
-        length: getNumber(embouchure, "length"),
-        width: getNumber(embouchure, "width"),
-        height: getNumber(embouchure, "height"),
-      };
-    }
-  }
-
-  // Bore points
-  doc.querySelectorAll("borePoint").forEach((bp) => {
-    instrument.borePoint!.push({
-      borePosition: getNumber(bp, "borePosition"),
-      boreDiameter: getNumber(bp, "boreDiameter"),
-    });
-  });
-
-  // Holes
-  doc.querySelectorAll("holes > hole").forEach((h) => {
-    instrument.hole!.push({
-      position: getNumber(h, "position"),
-      diameter: getNumber(h, "diameter"),
-      height: getNumber(h, "height") || 3,
-    });
-  });
-
-  // Termination
-  const term = doc.querySelector("termination");
-  if (term) {
-    instrument.termination = {
-      flangeDiameter: getNumber(term, "flangeDiameter"),
-    };
-  }
-
-  return instrument;
+  input.click();
 }
+
 
 // Preferences Modal
 function showPreferencesModal() {
@@ -1623,7 +1589,11 @@ function init() {
         }
         break;
       case "open":
-        importXMLFile();
+      case "open-instrument":
+        importInstrumentFile();
+        break;
+      case "open-tuning":
+        importTuningFile();
         break;
       case "preferences":
         showPreferencesModal();

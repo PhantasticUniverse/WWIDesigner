@@ -301,18 +301,16 @@ export function parseTuningXml(xml: string): Tuning {
   const fingerings: Fingering[] = [];
 
   for (const fNode of findChildren(root, "fingering")) {
-    // Parse note
+    // Parse note - always create a note object even if empty
     const noteNode = findChild(fNode, "note");
-    let note: Note | undefined;
-
-    if (noteNode) {
-      note = {
-        name: getChildText(noteNode, "name"),
-        frequency: getChildNumber(noteNode, "frequency"),
-        frequencyMin: getChildNumber(noteNode, "frequencyMin"),
-        frequencyMax: getChildNumber(noteNode, "frequencyMax"),
-      };
-    }
+    const note: Note = noteNode
+      ? {
+          name: getChildText(noteNode, "name"),
+          frequency: getChildNumber(noteNode, "frequency"),
+          frequencyMin: getChildNumber(noteNode, "frequencyMin"),
+          frequencyMax: getChildNumber(noteNode, "frequencyMax"),
+        }
+      : { name: "", frequency: undefined };
 
     // Parse open holes - they appear as multiple <openHole> elements
     const openHoleNodes = findChildren(fNode, "openHole");

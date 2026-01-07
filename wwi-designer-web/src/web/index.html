@@ -21,7 +21,9 @@
             <button data-action="new-instrument">New Instrument</button>
             <button data-action="new-tuning">New Tuning</button>
             <hr>
-            <button data-action="open">Open...</button>
+            <button data-action="open-instrument">Open Instrument...</button>
+            <button data-action="open-tuning">Open Tuning...</button>
+            <hr>
             <button data-action="save">Save</button>
             <button data-action="save-as">Save As...</button>
             <hr>
@@ -146,9 +148,13 @@
                   <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                   <span>Load Sample</span>
                 </button>
-                <button class="quick-action" data-action="open">
+                <button class="quick-action" data-action="open-instrument">
                   <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                  <span>Open File</span>
+                  <span>Open Instrument</span>
+                </button>
+                <button class="quick-action" data-action="open-tuning">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                  <span>Open Tuning</span>
                 </button>
               </div>
               <div class="info-section">
