@@ -554,9 +554,10 @@ export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
    * effective acoustic headspace from the reference point to the splitting edge.
    *
    * Note: Java's DefaultFippleMouthpieceCalculator iterates over mouthpiece.getHeadspace()
-   * bore sections. However, using bore sections directly gives worse parity (22 cents vs 16).
-   * The position-based approach gives better parity with Java predictions, suggesting
-   * there may be compensating differences elsewhere in Java's calculation pipeline.
+   * bore sections. However, the position-based approach gives better parity with Java
+   * predictions for most instruments tested. This may be because:
+   * 1. The bore section approach includes volume below position 0 (negative positions)
+   * 2. The effective acoustic headspace may not extend to the first bore point
    *
    * Java implementation note: the final volume is multiplied by 2.0
    * ("Multiplier reset using a more accurate headspace representation")

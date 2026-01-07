@@ -13,16 +13,16 @@ public class SimpleParityTest {
     public static void main(String[] args) {
         System.out.println("=== Java Parity Values ===\n");
 
-        // Test SimplePhysicalParameters at 72°F
+        // Test at 72°F
         double tempF = 72.0;
         double tempC = (tempF + 40.0) * 5.0 / 9.0 - 40.0;
         System.out.printf("Temperature: %.6f°F = %.6f°C%n", tempF, tempC);
 
-        // Speed of sound using Yang Yili formula
+        // Speed of sound using Yang Yili formula (SimplePhysicalParameters)
         double speedOfSound = calculateSpeedOfSound(tempC, 0.45);
         System.out.printf("Speed of sound (Yang Yili, 45%% humidity): %.6f m/s%n", speedOfSound);
 
-        // Linear approximations
+        // Linear approximations (SimplePhysicalParameters)
         double deltaT = tempC - 26.85;
         double rho = 1.1769 * (1.0 - 0.00335 * deltaT);
         double mu = 1.846e-5 * (1.0 + 0.0025 * deltaT);
@@ -39,6 +39,17 @@ public class SimpleParityTest {
         System.out.printf("Eta: %.9f%n", eta);
         System.out.printf("Wave number at 1 Hz: %.9f rad/m%n", waveNumber1);
         System.out.printf("Alpha constant: %.9f%n", alphaConstant);
+
+        // ASHRAE model values (PhysicalParameters - what Tube.calcR actually uses)
+        double[] ashrae = calculateASHRAE(tempC, 101.325, 45.0, 0.00039);
+        double ashraeRho = ashrae[0];
+        double ashraeSpeedOfSound = ashrae[1];
+        double ashraeAlpha = ashrae[2];
+        System.out.println("\n=== PhysicalParameters (ASHRAE model) ===");
+        System.out.printf("PhysParams.speedOfSound: %.6f m/s%n", ashraeSpeedOfSound);
+        System.out.printf("PhysParams.rho: %.6f kg/m³%n", ashraeRho);
+        double ashraeWaveNumber1 = 2.0 * Math.PI / ashraeSpeedOfSound;
+        System.out.printf("PhysParams.waveNumber1: %.9f rad/m%n", ashraeWaveNumber1);
 
         // Test values matching NAF_D_minor_cherry instrument (converted to metres)
         double mpPosition = 0.0043180280;  // 0.17 inches in metres
@@ -131,10 +142,14 @@ public class SimpleParityTest {
         System.out.println("\n=== Transfer Matrix (position-based) ===");
         System.out.printf("cos(k_delta_l): %.10f%n", cos_kl);
         System.out.printf("sin(k_delta_l): %.10f%n", sin_kl);
-        System.out.printf("r_rad: %.10f%n", r_rad);
+        System.out.printf("r_rad (SimpleParams): %.10f%n", r_rad);
 
-        Complex A = new Complex(cos_kl, r_rad * sin_kl / z0);
-        Complex B = Complex.I.multiply(sin_kl * z0).add(r_rad * cos_kl);
+        // r_rad using ASHRAE (PhysicalParameters) - what Tube.calcR actually uses
+        double r_rad_ashrae = calcR_ASHRAE(freq, radius, ashraeRho, ashraeSpeedOfSound);
+        System.out.printf("r_rad (PhysParams/ASHRAE): %.10f%n", r_rad_ashrae);
+
+        Complex A = new Complex(cos_kl, r_rad_ashrae * sin_kl / z0);
+        Complex B = Complex.I.multiply(sin_kl * z0).add(r_rad_ashrae * cos_kl);
         Complex C = Complex.I.multiply(sin_kl / z0);
         Complex D = new Complex(cos_kl);
 
@@ -142,6 +157,103 @@ public class SimpleParityTest {
         System.out.printf("B: (%.10f, %.10f)%n", B.getReal(), B.getImaginary());
         System.out.printf("C: (%.10f, %.10f)%n", C.getReal(), C.getImaginary());
         System.out.printf("D: (%.10f, %.10f)%n", D.getReal(), D.getImaginary());
+    }
+
+    /**
+     * Calculate r_rad using PhysicalParameters (ASHRAE) values.
+     * This is what Java Tube.calcR actually computes.
+     */
+    private static double calcR_ASHRAE(double freq, double radius, double rho, double c) {
+        double waveNumber = 2.0 * Math.PI * freq / c;
+        double ka = waveNumber * radius;
+        double ka2 = ka * ka;
+        double z0 = rho * c / (Math.PI * radius * radius);
+        return z0 * ka2 * (0.5 + 0.1053 * ka2) / (1.0 + ka2 * (0.358 + 0.1053 * ka2));
+    }
+
+    /**
+     * Calculate PhysicalParameters values using ASHRAE/CIPM model.
+     * @return array of [rho, speedOfSound, alphaConstant]
+     */
+    private static double[] calculateASHRAE(double tempC, double pressure, double relHumidity, double xCO2) {
+        double R = 8.314472;
+        double Ma0 = 28.960745;
+        double Mco2 = 44.01;
+        double Mo2 = 31.9988;
+        double Mv = 18.01527;
+
+        double kelvin = 273.15 + tempC;
+        double pascal = 1000.0 * pressure;
+
+        // Enhancement factor, from CIPM 2007
+        double enhancement = 1.00062 + 3.14e-5 * pressure + 5.6e-7 * tempC * tempC;
+
+        // Saturated vapour pressure, in kPa, from CIPM-2007
+        double Psv = 0.001 * Math.exp(1.2378847e-5 * kelvin * kelvin - 1.9121316e-2 * kelvin
+                + 33.93711047 - 6.3431645e3 / kelvin);
+
+        // Molar fraction of water vapour
+        double xv = 0.01 * relHumidity * enhancement * Psv / pressure;
+
+        // Compressibility factor, from CIPM-2007
+        double compressibility = 1.0
+                - (pascal / kelvin) * (1.58123e-6 - 2.9331e-8 * tempC
+                + 1.1043e-10 * tempC * tempC
+                + (5.707e-6 - 2.051e-8 * tempC) * xv
+                + (1.9898e-4 - 2.376e-6 * tempC) * xv * xv)
+                + (pascal / kelvin) * (pascal / kelvin) * (1.83e-11 - 0.765e-8 * xv * xv);
+
+        // Standard molar mass of dry air
+        double Ma = Ma0 + (Mco2 - Mo2) * xCO2;
+        // Standard molar mass of moist air
+        double M = (1.0 - xv) * Ma + xv * Mv;
+        // Specific gas constant of humid air
+        double Ra = R / (0.001 * M);
+        // Mass fractions
+        double qv = xv * Mv / M;
+        double qco2 = xCO2 * Mco2 / M;
+
+        // Air density
+        double rho = pressure * 1e3 / (compressibility * Ra * kelvin);
+
+        // Dynamic viscosity
+        double etaAir = 1.4592e-6 * Math.pow(kelvin, 1.5) / (kelvin + 109.10);
+        double etaVapour = 8.058131868e-6 + tempC * 4.000549451e-8;
+        double etaRatio = Math.sqrt(etaAir / etaVapour);
+        double humidityRatio = xv / (1.0 - xv);
+        double phiAV = 0.5 * Math.pow(1.0 + etaRatio * Math.pow(Mv / Ma, 0.25), 2.0)
+                / Math.sqrt(2.0 * (1.0 + Ma / Mv));
+        double phiVA = 0.5 * Math.pow(1.0 + Math.pow(Ma / Mv, 0.25) / etaRatio, 2.0)
+                / Math.sqrt(2.0 * (1.0 + Mv / Ma));
+        double eta = etaAir / (1.0 + phiAV * humidityRatio)
+                + humidityRatio * etaVapour / (humidityRatio + phiVA);
+
+        // Isobaric specific heat
+        double cpAir = 1032.0 + kelvin * (-0.284887 + kelvin * (0.7816818e-3 + kelvin * (-0.4970786e-6 + kelvin * 0.1077024e-9)));
+        double cpVapour = 1869.10989 + tempC * (-0.2578421578 + tempC * 1.941058941e-2);
+        double cpCO2 = 817.02 + tempC * (1.0562 - tempC * 6.67e-4);
+        double specificHeat = cpAir * (1 - qv - qco2) + cpVapour * qv + cpCO2 * qco2;
+
+        // Ratio of specific heats
+        double gamma = specificHeat / (specificHeat - Ra);
+
+        // Thermal conductivity
+        double kappaAir = 2.334e-3 * Math.pow(kelvin, 1.5) / (kelvin + 164.54);
+        double kappaVapour = 0.01761758242 + tempC * (5.558941059e-5 + tempC * 1.663336663e-7);
+        double kappa = kappaAir / (1.0 + phiAV * humidityRatio)
+                + humidityRatio * kappaVapour / (humidityRatio + phiVA);
+
+        // Prandtl number
+        double prandtl = eta * specificHeat / kappa;
+
+        // Speed of sound
+        double speedOfSound = Math.sqrt(gamma * compressibility * Ra * kelvin);
+
+        // Alpha constant
+        double alphaConstant = Math.sqrt(eta / (2.0 * rho * speedOfSound))
+                * (1.0 + (gamma - 1.0) / Math.sqrt(prandtl));
+
+        return new double[]{rho, speedOfSound, alphaConstant};
     }
 
     /**
