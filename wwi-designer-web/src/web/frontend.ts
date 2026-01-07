@@ -773,12 +773,94 @@ function drawInstrument(instrument: Instrument, canvasId: string) {
     ctx.fillText(`${bp.borePosition}`, x, height - 10);
   }
 
+  // Draw mouthpiece
+  drawMouthpiece(ctx, instrument, posToX, diaToY, centerY, scale);
+
   // Title
   ctx.fillStyle = "#333";
   ctx.font = "14px sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(`Length: ${maxPos - minPos} mm`, padding, 20);
   ctx.fillText(`Holes: ${holes.length}`, padding + 150, 20);
+}
+
+function drawMouthpiece(
+  ctx: CanvasRenderingContext2D,
+  instrument: Instrument,
+  posToX: (pos: number) => number,
+  diaToY: (dia: number) => number,
+  centerY: number,
+  scale: number
+) {
+  const mouthpiece = instrument.mouthpiece;
+  if (!mouthpiece) return;
+
+  const mpPos = mouthpiece.position;
+
+  // Draw fipple window as a rectangle
+  if (mouthpiece.fipple) {
+    const fipple = mouthpiece.fipple;
+    const windowLength = fipple.windowLength || 0;
+    const windowWidth = fipple.windowWidth || 0;
+
+    if (windowLength > 0 && windowWidth > 0) {
+      // Window rectangle (solid)
+      const windowLeft = posToX(mpPos - windowLength);
+      const windowRight = posToX(mpPos);
+      const halfWidth = (windowWidth / 2) * scale;
+
+      ctx.beginPath();
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 2;
+      ctx.moveTo(windowRight, centerY - halfWidth);
+      ctx.lineTo(windowRight, centerY + halfWidth);
+      ctx.lineTo(windowLeft, centerY + halfWidth);
+      ctx.lineTo(windowLeft, centerY - halfWidth);
+      ctx.closePath();
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.stroke();
+
+      // Windway rectangle (dashed) if present
+      if (fipple.windwayLength && fipple.windwayLength > 0) {
+        const windwayExit = mpPos - windowLength;
+        const windwayLeft = posToX(windwayExit - fipple.windwayLength);
+        const windwayRight = posToX(windwayExit);
+
+        ctx.beginPath();
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 2]);
+        ctx.moveTo(windwayLeft, centerY - halfWidth);
+        ctx.lineTo(windwayRight, centerY - halfWidth);
+        ctx.lineTo(windwayRight, centerY + halfWidth);
+        ctx.lineTo(windwayLeft, centerY + halfWidth);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // Draw embouchure hole as an oval
+  if (mouthpiece.embouchureHole) {
+    const emb = mouthpiece.embouchureHole;
+    const embLength = emb.length || 0;
+    const embWidth = emb.width || 0;
+
+    if (embLength > 0 && embWidth > 0) {
+      const cx = posToX(mpPos);
+      const radiusX = (embLength / 2) * scale;
+      const radiusY = (embWidth / 2) * scale;
+
+      ctx.beginPath();
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 1.5;
+      ctx.ellipse(cx, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
 }
 
 function getBoreDiameterAtPosition(borePoints: BorePoint[], position: number): number {

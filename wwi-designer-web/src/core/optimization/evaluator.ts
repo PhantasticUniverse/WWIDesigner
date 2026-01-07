@@ -234,10 +234,234 @@ export class ReactanceEvaluator implements IEvaluator {
 }
 
 /**
+ * Evaluator that calculates deviation from target fmin (minimum frequency) in cents.
+ *
+ * Uses the tuner's predictedNote() to get the predicted playing range.
+ * For notes without frequencyMin, returns 0 deviation (excluded from optimization).
+ *
+ * Ported from com.wwidesigner.modelling.FminEvaluator
+ */
+export class FminEvaluator extends BaseEvaluator {
+  /** Default error value when prediction fails */
+  private static readonly DEFAULT_ERROR = 400.0;
+
+  protected createDefaultTuner(): IInstrumentTuner {
+    const instrument = this.calculator.getInstrument();
+    const params = this.calculator.getParams();
+    const tuning = { name: "", numberOfHoles: 0, fingering: [] };
+    return new SimpleInstrumentTuner(
+      instrument,
+      tuning,
+      this.calculator,
+      params
+    );
+  }
+
+  /**
+   * Calculate fmin deviation in cents for each fingering target.
+   */
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    const errorValues: number[] = new Array(fingeringTargets.length);
+
+    this.tuner.setTuning({
+      name: "Target",
+      numberOfHoles: fingeringTargets[0]?.openHole.length ?? 0,
+      fingering: fingeringTargets,
+    });
+
+    for (let i = 0; i < fingeringTargets.length; i++) {
+      const actual = fingeringTargets[i]!;
+      let centDeviation = FminEvaluator.DEFAULT_ERROR;
+
+      if (actual.note?.frequencyMin !== undefined) {
+        try {
+          const predicted = this.tuner.predictedNote(actual);
+          if (predicted.frequencyMin !== undefined) {
+            centDeviation = calcCents(actual.note.frequencyMin, predicted.frequencyMin);
+          }
+        } catch {
+          // Keep default error value
+        }
+      } else {
+        // No target available - don't include in optimization
+        centDeviation = 0.0;
+      }
+
+      errorValues[i] = centDeviation;
+    }
+
+    return errorValues;
+  }
+}
+
+/**
+ * Evaluator that calculates deviation from target fmax (maximum frequency) in cents.
+ *
+ * Uses the tuner's predictedNote() to get the predicted playing range.
+ * For notes without frequencyMax, returns 0 deviation (excluded from optimization).
+ *
+ * Ported from com.wwidesigner.modelling.FmaxEvaluator
+ */
+export class FmaxEvaluator extends BaseEvaluator {
+  /** Default error value when prediction fails */
+  private static readonly DEFAULT_ERROR = 400.0;
+
+  protected createDefaultTuner(): IInstrumentTuner {
+    const instrument = this.calculator.getInstrument();
+    const params = this.calculator.getParams();
+    const tuning = { name: "", numberOfHoles: 0, fingering: [] };
+    return new SimpleInstrumentTuner(
+      instrument,
+      tuning,
+      this.calculator,
+      params
+    );
+  }
+
+  /**
+   * Calculate fmax deviation in cents for each fingering target.
+   */
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    const errorValues: number[] = new Array(fingeringTargets.length);
+
+    this.tuner.setTuning({
+      name: "Target",
+      numberOfHoles: fingeringTargets[0]?.openHole.length ?? 0,
+      fingering: fingeringTargets,
+    });
+
+    for (let i = 0; i < fingeringTargets.length; i++) {
+      const actual = fingeringTargets[i]!;
+      let centDeviation = FmaxEvaluator.DEFAULT_ERROR;
+
+      if (actual.note?.frequencyMax !== undefined) {
+        try {
+          const predicted = this.tuner.predictedNote(actual);
+          if (predicted.frequencyMax !== undefined) {
+            centDeviation = calcCents(actual.note.frequencyMax, predicted.frequencyMax);
+          }
+        } catch {
+          // Keep default error value
+        }
+      } else {
+        // No target available - don't include in optimization
+        centDeviation = 0.0;
+      }
+
+      errorValues[i] = centDeviation;
+    }
+
+    return errorValues;
+  }
+}
+
+/**
+ * Evaluator that combines fmin, fmax, and nominal frequency deviations.
+ *
+ * Uses weighted combination:
+ * - FMAX_WEIGHT = 4.0 (prioritizes fmax accuracy)
+ * - FMIN_WEIGHT = 1.0
+ * - FPLAYING_WEIGHT = 1.0 (used only when min/max not available)
+ *
+ * For notes with both fmax and fmin, returns sqrt(fmax² + fmin²) weighted.
+ *
+ * Ported from com.wwidesigner.modelling.FminmaxEvaluator
+ */
+export class FminmaxEvaluator extends BaseEvaluator {
+  /** Default error value when prediction fails */
+  private static readonly DEFAULT_ERROR = 1200.0;
+
+  /** Weight for fmax deviation */
+  private static readonly FMAX_WEIGHT = 4.0;
+  /** Weight for fmin deviation */
+  private static readonly FMIN_WEIGHT = 1.0;
+  /** Weight for nominal frequency deviation (when no min/max available) */
+  private static readonly FPLAYING_WEIGHT = 1.0;
+
+  protected createDefaultTuner(): IInstrumentTuner {
+    const instrument = this.calculator.getInstrument();
+    const params = this.calculator.getParams();
+    const tuning = { name: "", numberOfHoles: 0, fingering: [] };
+    return new SimpleInstrumentTuner(
+      instrument,
+      tuning,
+      this.calculator,
+      params
+    );
+  }
+
+  /**
+   * Calculate weighted combined deviation for each fingering target.
+   */
+  calculateErrorVector(fingeringTargets: Fingering[]): number[] {
+    const errorValues: number[] = new Array(fingeringTargets.length);
+
+    this.tuner.setTuning({
+      name: "Target",
+      numberOfHoles: fingeringTargets[0]?.openHole.length ?? 0,
+      fingering: fingeringTargets,
+    });
+
+    for (let i = 0; i < fingeringTargets.length; i++) {
+      const actual = fingeringTargets[i]!;
+      let centDeviation = FminmaxEvaluator.DEFAULT_ERROR;
+
+      if (actual.note) {
+        try {
+          const predicted = this.tuner.predictedNote(actual);
+
+          if (actual.note.frequencyMax !== undefined && predicted.frequencyMax !== undefined) {
+            // Have fmax - calculate weighted deviation
+            const fmaxDeviation = FminmaxEvaluator.FMAX_WEIGHT *
+              calcCents(actual.note.frequencyMax, predicted.frequencyMax);
+
+            if (actual.note.frequencyMin !== undefined && predicted.frequencyMin !== undefined) {
+              // Have both fmax and fmin - combine with sqrt(sum of squares)
+              const fminDeviation = FminmaxEvaluator.FMIN_WEIGHT *
+                calcCents(actual.note.frequencyMin, predicted.frequencyMin);
+              centDeviation = Math.sqrt(
+                fmaxDeviation * fmaxDeviation + fminDeviation * fminDeviation
+              );
+            } else {
+              centDeviation = fmaxDeviation;
+            }
+          } else if (actual.note.frequencyMin !== undefined && predicted.frequencyMin !== undefined) {
+            // Only have fmin
+            centDeviation = FminmaxEvaluator.FMIN_WEIGHT *
+              calcCents(actual.note.frequencyMin, predicted.frequencyMin);
+          } else if (actual.note.frequency !== undefined && predicted.frequency !== undefined) {
+            // Fall back to nominal frequency
+            centDeviation = FminmaxEvaluator.FPLAYING_WEIGHT *
+              calcCents(actual.note.frequency, predicted.frequency);
+          } else {
+            // No target available - don't include in optimization
+            centDeviation = 0.0;
+          }
+        } catch {
+          // Keep default error value
+        }
+      } else {
+        // No target available - don't include in optimization
+        centDeviation = 0.0;
+      }
+
+      errorValues[i] = centDeviation;
+    }
+
+    return errorValues;
+  }
+}
+
+/**
+ * Supported evaluator types.
+ */
+export type EvaluatorType = "cents" | "frequency" | "reactance" | "fmin" | "fmax" | "fminmax";
+
+/**
  * Factory function to create an evaluator of a given type.
  */
 export function createEvaluator(
-  type: "cents" | "frequency" | "reactance",
+  type: EvaluatorType,
   calculator: IInstrumentCalculator,
   tuner?: IInstrumentTuner
 ): IEvaluator {
@@ -248,6 +472,12 @@ export function createEvaluator(
       return new FrequencyDeviationEvaluator(calculator, tuner);
     case "reactance":
       return new ReactanceEvaluator(calculator);
+    case "fmin":
+      return new FminEvaluator(calculator, tuner);
+    case "fmax":
+      return new FmaxEvaluator(calculator, tuner);
+    case "fminmax":
+      return new FminmaxEvaluator(calculator, tuner);
     default:
       return new CentDeviationEvaluator(calculator, tuner);
   }

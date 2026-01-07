@@ -101,13 +101,95 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 
 ## Migration Status
 
-- [x] Phase 1: Data models
+### Core Acoustic Engine (100% Complete)
+- [x] Phase 1: Data models (Instrument, Tuning, Constraints)
 - [x] Phase 2: Math (Complex, TransferMatrix, StateVector)
 - [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
 - [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
 - [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
-- [x] Phase 6: Optimization (DIRECT algorithm, evaluators, objective functions)
+- [x] Phase 6: Optimization (DIRECT algorithm, 2 evaluators, basic objective function)
 - [x] Phase 7: Web UI (Bun.serve, instrument/tuning editors, visualization, optimization)
+
+### Recently Completed Features
+
+#### Phase 8: Visualization Parity (Complete)
+- [x] Mouthpiece visualization (fipple window rectangle, embouchure oval)
+- [x] Windway dashed rectangle display
+
+#### Phase 9: Advanced Evaluators (Partial - 5/8 Complete)
+- [x] FminEvaluator - First minimum frequency detection
+- [x] FmaxEvaluator - First maximum frequency detection
+- [x] FminmaxEvaluator - Combined min/max evaluation
+- [ ] BellNoteEvaluator - Playing range analysis
+- [ ] ReflectionEvaluator - Reflection coefficient analysis
+- [ ] WhistleEvaluator - Whistle-specific evaluation
+
+#### Phase 11: Spectrum Analysis (Complete)
+- [x] ImpedanceSpectrum - Impedance magnitude vs frequency
+- [x] ReflectanceSpectrum - Reflection coefficient spectrum
+- [ ] PlayingRangeSpectrum - Playable frequency analysis
+
+#### Phase 13: Advanced Tuners (Partial - 1/2 Complete)
+- [x] LinearVInstrumentTuner - Volume-based linear tuner
+- [ ] LinearXInstrumentTuner - Position-based linear tuner
+
+### Remaining Features (~60% Remaining)
+
+#### Phase 10: Objective Functions (53 missing from Java)
+- [ ] Hole position objectives (HolePositionFromTopObjectiveFunction, etc.)
+- [ ] Hole size objectives (HoleSizeObjectiveFunction, etc.)
+- [ ] Bore objectives (BoreDiameterObjectiveFunction, BoreLengthObjectiveFunction)
+- [ ] Taper objectives (TaperRatioObjectiveFunction, etc.)
+- [ ] Mouthpiece objectives (FippleFactorObjectiveFunction, etc.)
+- [ ] Combined objectives (HoleAndBoreObjectiveFunction, etc.)
+- [ ] Grouped hole objectives (HoleGroupObjectiveFunction)
+
+#### Phase 12: Study Framework
+- [ ] BaseStudyModel abstraction
+- [ ] NafStudyModel - Native American Flute workflows
+- [ ] WhistleStudyModel - Whistle instrument workflows
+- [ ] FluteStudyModel - Transverse flute workflows
+- [ ] ReedStudyModel - Reed instrument workflows
+
+#### Phase 14: Additional Optimization Features
+- [ ] Hole grouping constraints (linked hole sizes)
+- [ ] Multi-start optimization
+- [ ] Constraint validation/reporting
+
+## Feature Gap Analysis
+
+### Current Implementation Coverage
+
+| Category | Java Count | TypeScript Count | Coverage |
+|----------|------------|------------------|----------|
+| Bore Section Calculators | 4 | 4 | 100% |
+| Hole Calculators | 2 | 2 | 100% |
+| Mouthpiece Calculators | 4 | 4 | 100% |
+| Termination Calculators | 5 | 5 | 100% |
+| Instrument Calculators | 3 | 2 | 67% |
+| Evaluators | 8 | 5 | 63% |
+| Objective Functions | 55 | 2 | 4% |
+| Tuners | 5 | 4 | 80% |
+| Spectrum Analyzers | 3 | 2 | 67% |
+| Study Models | 4 | 0 | 0% |
+
+### Priority Queue
+
+**High Priority (Core Functionality):**
+1. ~~Mouthpiece visualization - Quick win, visual parity~~ ✓
+2. ~~FminEvaluator, FmaxEvaluator - Required for many objective functions~~ ✓
+3. HoleGroupObjectiveFunction - Common optimization use case
+4. BoreDiameterObjectiveFunction - Bore optimization
+
+**Medium Priority (Extended Features):**
+5. ~~ImpedanceSpectrum - Analysis tool~~ ✓
+6. ~~ReflectanceSpectrum - Analysis tool~~ ✓
+7. Remaining hole objectives (10+ functions)
+8. Bore/taper objectives (5+ functions)
+
+**Lower Priority (Specialized):**
+9. Study framework - Application-specific workflows
+10. Specialized evaluators (Bell, Whistle)
 
 ## Running the Web Application
 

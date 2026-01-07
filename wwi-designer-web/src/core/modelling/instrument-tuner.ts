@@ -338,3 +338,273 @@ export function createInstrumentTuner(
   const calculator = new DefaultInstrumentCalculator(instrument, physicalParams);
   return new SimpleInstrumentTuner(instrument, tuning, calculator, physicalParams);
 }
+
+/**
+ * InstrumentTuner for calculators that predict minimum and maximum
+ * frequencies of a playing range. Predicts nominal frequency from
+ * a nominal playing pattern of an instrument (how the player would
+ * expect to play each note).
+ *
+ * For the nominal playing pattern, we use a linear change in blowing
+ * velocity from just below fmax for the lowest note, to somewhat above
+ * fmin for the highest note.
+ *
+ * cf. Fletcher and Rossing, The physics of musical instruments, 2nd ed.,
+ * New York: Springer, 2010, section 16.10 and figure 16.23.
+ *
+ * Ported from com.wwidesigner.modelling.LinearVInstrumentTuner
+ */
+export class LinearVInstrumentTuner extends InstrumentTuner {
+  // Target velocity of lowest note is less than velocity at fmax
+  // by BottomFraction of the velocity difference between fmax and fmin.
+  // Target velocity of highest note is less than velocity at fmax
+  // by TopFraction of the velocity difference between fmax and fmin.
+  protected bottomFraction: number;
+  protected topFraction: number;
+
+  // Blowing level lookup tables (from Java implementation)
+  private static readonly BOTTOM_FRACTIONS = [
+    0.35, 0.35, 0.30, 0.30, 0.25, 0.25, 0.20, 0.15, 0.10, 0.10, 0.05
+  ];
+  private static readonly TOP_FRACTIONS = [
+    0.80, 0.85, 0.90, 0.95, 0.90, 0.95, 0.95, 0.95, 0.95, 0.99, 0.99
+  ];
+
+  protected fLow: number = 100.0;   // Lowest frequency in target range
+  protected fHigh: number = 100.0;  // Highest frequency in target range
+  // Linear equation parameters for calculating nominal velocity:
+  // Vnom = slope * f + intercept
+  protected slope: number = 0.0;
+  protected intercept: number = 0.0;
+
+  constructor(
+    instrument: Instrument,
+    tuning: Tuning,
+    calculator: IInstrumentCalculator,
+    params: PhysicalParameters,
+    blowingLevel: number = 5
+  ) {
+    super(instrument, tuning, calculator, params);
+    this.bottomFraction = LinearVInstrumentTuner.calcBottomFraction(blowingLevel);
+    this.topFraction = LinearVInstrumentTuner.calcTopFraction(blowingLevel);
+
+    if (tuning.fingering.length > 0) {
+      this.setFingering(tuning.fingering);
+    }
+  }
+
+  private static calcBottomFraction(blowingLevel: number): number {
+    if (blowingLevel < 0) return 0.20; // BottomLo
+    if (blowingLevel > 10) return 0.05; // BottomHi
+    return LinearVInstrumentTuner.BOTTOM_FRACTIONS[blowingLevel] ?? 0.125;
+  }
+
+  private static calcTopFraction(blowingLevel: number): number {
+    if (blowingLevel < 0) return 0.99; // TopLo
+    if (blowingLevel > 10) return 0.30; // TopHi
+    return LinearVInstrumentTuner.TOP_FRACTIONS[blowingLevel] ?? 0.65;
+  }
+
+  /**
+   * Estimate the average velocity of air leaving the windway.
+   * @param f Actual playing frequency, in Hz
+   * @param windowLength Length of window, in meters
+   * @param z Total impedance of whistle
+   * @returns Estimated average air velocity leaving windway, in m/s
+   */
+  public static velocity(f: number, windowLength: number, zRatio: number): number {
+    let strouhal = 0.26 - 0.037 * zRatio;
+    // Within a playing range, z.imag should be negative,
+    // so strouhal > 0.26, and generally strouhal < 0.5.
+    // Clamp if we go too far outside limits of reasonableness.
+    if (strouhal < 0.13) strouhal = 0.13;
+    else if (strouhal > 0.75) strouhal = 0.75;
+
+    return f * windowLength / strouhal;
+  }
+
+  /**
+   * Estimate the expected ratio Im(z)/Re(z) for a given air velocity.
+   * @param f Playing frequency, in Hz
+   * @param windowLength Length of window, in meters
+   * @param velocity Average air velocity leaving windway, in m/s
+   * @returns Predicted ratio Im(z)/Re(z)
+   */
+  public static zRatio(f: number, windowLength: number, velocity: number): number {
+    return (0.26 - f * windowLength / velocity) / 0.037;
+  }
+
+  /**
+   * Set interpolation parameters to interpolate velocity for a specified
+   * set of fingering targets. Following this call, use getNominalV() to
+   * return interpolated velocity.
+   */
+  protected setFingering(fingeringTargets: Fingering[]): void {
+    // Get lowest and highest target notes
+    this.fLow = 100000.0;
+    this.fHigh = 0.0;
+    let vLow = 0.0;
+    let vHigh = 0.0;
+
+    const airstreamLength = this.instrument.mouthpiece.fipple?.windowLength ??
+      this.instrument.mouthpiece.embouchureHole?.airstreamLength ?? 0.01;
+
+    // Find lowest and highest target notes
+    let noteLow: Fingering | null = null;
+    let noteHigh: Fingering | null = null;
+
+    for (const target of fingeringTargets) {
+      if (target.note && (target.optimizationWeight ?? 1) > 0) {
+        const freq = target.note.frequency ?? target.note.frequencyMax;
+        if (freq !== undefined) {
+          if (freq < this.fLow) {
+            this.fLow = freq;
+            noteLow = { ...target };
+          }
+          if (freq > this.fHigh) {
+            this.fHigh = freq;
+            noteHigh = { ...target };
+          }
+        }
+      }
+    }
+
+    if (!noteLow || !noteHigh) {
+      // No valid notes found
+      return;
+    }
+
+    // Locate playing ranges at fLow and fHigh
+    const range = new PlayingRange(this.calculator, noteLow);
+    try {
+      // Find playing range for lowest note
+      const fmax = range.findXZero(this.fLow);
+      const fmin = range.findFmin(fmax);
+      const z_max = this.calculator.calcZ(fmax, noteLow);
+      const z_min = this.calculator.calcZ(fmin, noteLow);
+      const vMax = LinearVInstrumentTuner.velocity(fmax, airstreamLength, z_max.im / z_max.re);
+      const vMin = LinearVInstrumentTuner.velocity(fmin, airstreamLength, z_min.im / z_min.re);
+      vLow = vMax - this.bottomFraction * (vMax - vMin);
+      // For velocity interpolation, use fmax as the nominal low frequency
+      this.fLow = fmax;
+    } catch {
+      // Use predicted velocity at fLow set to fmax (Im(Z)=0)
+      vLow = LinearVInstrumentTuner.velocity(this.fLow, airstreamLength, 0);
+    }
+
+    range.setFingering(noteHigh);
+    try {
+      // Find playing range for highest note
+      const fmax = range.findXZero(this.fHigh);
+      const fmin = range.findFmin(fmax);
+      const z_max = this.calculator.calcZ(fmax, noteHigh);
+      const z_min = this.calculator.calcZ(fmin, noteHigh);
+      const vMax = LinearVInstrumentTuner.velocity(fmax, airstreamLength, z_max.im / z_max.re);
+      const vMin = LinearVInstrumentTuner.velocity(fmin, airstreamLength, z_min.im / z_min.re);
+      vHigh = vMax - this.topFraction * (vMax - vMin);
+      // For velocity interpolation, use fmin as the nominal high frequency
+      this.fHigh = fmin;
+    } catch {
+      // Use predicted velocity at fHigh set to fmax (Im(Z)=0)
+      vHigh = LinearVInstrumentTuner.velocity(this.fHigh, airstreamLength, 0);
+    }
+
+    // Nominal velocity is a linear interpolation between (fLow,vLow) and (fHigh,vHigh)
+    if (this.fHigh !== this.fLow) {
+      this.slope = (vHigh - vLow) / (this.fHigh - this.fLow);
+      this.intercept = vLow - this.slope * this.fLow;
+    } else {
+      this.slope = 0;
+      this.intercept = vLow;
+    }
+  }
+
+  /**
+   * Following a call to setFingering(), return interpolated velocity.
+   * @param f Frequency
+   * @returns Nominal velocity at specified frequency
+   */
+  public getNominalV(f: number): number {
+    return this.slope * f + this.intercept;
+  }
+
+  /**
+   * Predict the nominal playing frequency.
+   */
+  predictedFrequency(fingering: Fingering): number | null {
+    const targetNote = fingering.note;
+    const target = this.getFrequencyTarget(targetNote);
+    if (target === 0) return null;
+
+    const range = new PlayingRange(this.calculator, fingering);
+    try {
+      const airstreamLength = this.instrument.mouthpiece.fipple?.windowLength ??
+        this.instrument.mouthpiece.embouchureHole?.airstreamLength ?? 0.01;
+      const zRatioTarget = LinearVInstrumentTuner.zRatio(target, airstreamLength, this.getNominalV(target));
+      return range.findZRatio(target, zRatioTarget);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Predict the played note with fmin, fmax, and nominal frequency.
+   */
+  predictedNote(fingering: Fingering): Note {
+    const targetNote = fingering.note;
+    const predNote: Note = {
+      name: targetNote?.name,
+    };
+
+    const target = this.getFrequencyTarget(targetNote);
+    if (target === 0) {
+      // No target frequency - return note without prediction
+      return predNote;
+    }
+
+    // Predict playing range
+    const range = new PlayingRange(this.calculator, fingering);
+    try {
+      const fmax = range.findXZero(target);
+      predNote.frequencyMax = fmax;
+      const fmin = range.findFmin(fmax);
+      predNote.frequencyMin = fmin;
+    } catch {
+      // Leave fmax and fmin unassigned
+    }
+
+    try {
+      const airstreamLength = this.instrument.mouthpiece.fipple?.windowLength ??
+        this.instrument.mouthpiece.embouchureHole?.airstreamLength ?? 0.01;
+      const velocity = this.getNominalV(target);
+      const zRatioTarget = LinearVInstrumentTuner.zRatio(target, airstreamLength, velocity);
+      const fnom = range.findZRatio(target, zRatioTarget);
+      predNote.frequency = fnom;
+    } catch {
+      // Leave fnom unassigned
+    }
+
+    return predNote;
+  }
+
+  override setTuning(tuning: Tuning): void {
+    super.setTuning(tuning);
+    if (tuning && tuning.fingering.length > 0) {
+      this.setFingering(tuning.fingering);
+    }
+  }
+}
+
+/**
+ * Create a LinearV instrument tuner.
+ */
+export function createLinearVTuner(
+  instrument: Instrument,
+  tuning: Tuning,
+  params?: PhysicalParameters,
+  blowingLevel: number = 5
+): LinearVInstrumentTuner {
+  const physicalParams = params ?? new PhysicalParameters();
+  const calculator = new DefaultInstrumentCalculator(instrument, physicalParams);
+  return new LinearVInstrumentTuner(instrument, tuning, calculator, physicalParams, blowingLevel);
+}
