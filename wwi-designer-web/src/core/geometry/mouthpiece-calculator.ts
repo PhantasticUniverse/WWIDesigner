@@ -547,26 +547,23 @@ export class DefaultFippleMouthpieceCalculator extends MouthpieceCalculator {
   }
 
   /**
-   * Calculate headspace volume.
+   * Calculate headspace volume by summing bore section volumes.
    *
-   * Uses position-based calculation where the headspace length is the
-   * mouthpiece position (measured from position 0). This represents the
-   * effective acoustic headspace from the reference point to the splitting edge.
-   *
-   * Note: Java's DefaultFippleMouthpieceCalculator iterates over mouthpiece.getHeadspace()
-   * bore sections. However, the position-based approach gives better parity with Java
-   * predictions for most instruments tested. This may be because:
-   * 1. The bore section approach includes volume below position 0 (negative positions)
-   * 2. The effective acoustic headspace may not extend to the first bore point
+   * Matches Java's DefaultFippleMouthpieceCalculator.calcHeadspaceVolume()
+   * which iterates over mouthpiece.getHeadspace() bore sections.
    *
    * Java implementation note: the final volume is multiplied by 2.0
-   * ("Multiplier reset using a more accurate headspace representation")
+   * ("Multiplier reset using a more accurate headspace representation,
+   * and verified with a square-end flute with better intonation than
+   * the Ken Light flute that was originally used.")
    */
   private calcHeadspaceVolume(mouthpiece: Mouthpiece): number {
-    // Use position-based calculation for better parity with Java results
-    const radius = 0.5 * (mouthpiece.boreDiameter ?? 0.01);
-    const length = mouthpiece.position;
-    const volume = Math.PI * radius * radius * length;
+    const headspace = mouthpiece.headspace ?? [];
+    let volume = 0;
+
+    for (const section of headspace) {
+      volume += this.getSectionVolume(section);
+    }
 
     // Multiply by 2.0 based on Java implementation
     return volume * 2.0;
