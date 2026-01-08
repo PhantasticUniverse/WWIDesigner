@@ -285,16 +285,8 @@ function renderMouthpieceEditor(instrument: Instrument, tabId: string): string {
           <label>TSH Width</label>
           <input type="number" step="0.01" id="fipple-width-${tabId}" value="${mp.fipple?.windowWidth || ""}" />
         </div>
-        <div class="form-group">
-          <label>Window Height</label>
-          <input type="number" step="0.01" id="fipple-height-${tabId}" value="${mp.fipple?.windowHeight || ""}" />
-        </div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Windway Length</label>
-          <input type="number" step="0.01" id="windway-length-${tabId}" value="${mp.fipple?.windwayLength || ""}" />
-        </div>
         <div class="form-group">
           <label>Flue Depth</label>
           <input type="number" step="0.001" id="windway-height-${tabId}" value="${mp.fipple?.windwayHeight || ""}" />
@@ -468,19 +460,19 @@ function updateInstrumentFromEditor(tabId: string, instrumentId: string) {
   const mpType = mpTypeRadio?.value || "fipple";
 
   if (mpType === "fipple") {
-    // Read all fipple values
+    // Read fipple values (matching NafPanel fields)
     const windowLengthVal = $<HTMLInputElement>(`#fipple-length-${tabId}`)?.value;
     const windowWidthVal = $<HTMLInputElement>(`#fipple-width-${tabId}`)?.value;
-    const windowHeightVal = $<HTMLInputElement>(`#fipple-height-${tabId}`)?.value;
-    const windwayLengthVal = $<HTMLInputElement>(`#windway-length-${tabId}`)?.value;
     const windwayHeightVal = $<HTMLInputElement>(`#windway-height-${tabId}`)?.value;
     const fippleFactorVal = $<HTMLInputElement>(`#fipple-factor-${tabId}`)?.value;
 
+    // Preserve existing values for fields not shown in UI
+    const existingFipple = inst.mouthpiece.fipple || {};
     inst.mouthpiece.fipple = {
       windowLength: windowLengthVal ? parseFloat(windowLengthVal) : undefined,
       windowWidth: windowWidthVal ? parseFloat(windowWidthVal) : undefined,
-      windowHeight: windowHeightVal ? parseFloat(windowHeightVal) : undefined,
-      windwayLength: windwayLengthVal ? parseFloat(windwayLengthVal) : undefined,
+      windowHeight: existingFipple.windowHeight,
+      windwayLength: existingFipple.windwayLength,
       windwayHeight: windwayHeightVal ? parseFloat(windwayHeightVal) : undefined,
       fippleFactor: fippleFactorVal ? parseFloat(fippleFactorVal) : undefined,
     };
