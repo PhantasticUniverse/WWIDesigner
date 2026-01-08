@@ -155,9 +155,10 @@ async function handleOptimize(req: Request): Promise<Response> {
 
     const startTime = performance.now();
 
+    // Use objective function's default maxEvaluations
+    // (each objective function specifies its own limits based on complexity)
     const result = optimizeObjectiveFunction(objective, {
-      maxIterations: 1000,
-      tolerance: 1e-6,
+      onProgress: (message) => console.log(message),
     });
 
     const elapsedTime = (performance.now() - startTime) / 1000;
