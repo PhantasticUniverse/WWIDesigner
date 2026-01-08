@@ -749,11 +749,11 @@ describe("Objective Functions", () => {
 
       // First constraint is bore length (dimensional)
       expect(constraintList[0]!.name).toBe("Bore length");
-      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONAL");
 
       // Second constraint is top hole ratio (dimensionless)
       expect(constraintList[1]!.name).toContain("bore-length fraction");
-      expect(constraintList[1]!.type).toBe("DIMENSIONLESS");
+      expect(constraintList[1]!.type as string).toBe("DIMENSIONLESS");
     });
 
     test("value returns finite error", () => {
@@ -921,8 +921,8 @@ describe("Objective Functions", () => {
 
       // All constraints should be dimensionless (ratios)
       for (const constraint of constraintList) {
-        expect(constraint.type).toBe("DIMENSIONLESS");
-        expect(constraint.name).toContain("Ratio");
+        expect(constraint!.type as string).toBe("DIMENSIONLESS");
+        expect(constraint!.name).toContain("Ratio");
       }
     });
   });
@@ -1100,7 +1100,7 @@ describe("Objective Functions", () => {
 
       expect(constraintList.length).toBe(2);
       for (const constraint of constraintList) {
-        expect(constraint.type).toBe("DIMENSIONLESS");
+        expect(constraint!.type as string).toBe("DIMENSIONLESS");
       }
     });
 
@@ -1239,7 +1239,7 @@ describe("Objective Functions", () => {
 
       expect(constraintList.length).toBe(3);
       for (const constraint of constraintList) {
-        expect(constraint.type).toBe("DIMENSIONLESS");
+        expect(constraint!.type as string).toBe("DIMENSIONLESS");
       }
     });
 
@@ -1388,7 +1388,7 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(1);
-      expect(constraintList[0]!.type).toBe("DIMENSIONLESS");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONLESS");
       expect(constraintList[0]!.name).toBe("Fipple factor");
     });
 
@@ -1575,7 +1575,7 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(1);
-      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONAL");
       expect(constraintList[0]!.name).toBe("Window height");
     });
 
@@ -1792,7 +1792,7 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(1);
-      expect(constraintList[0]!.type).toBe("DIMENSIONLESS");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONLESS");
       expect(constraintList[0]!.name).toBe("Beta");
     });
   });
@@ -1929,7 +1929,7 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(1);
-      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONAL");
       expect(constraintList[0]!.name).toBe("Airstream length");
     });
   });
@@ -2284,8 +2284,6 @@ describe("Objective Functions", () => {
         beta: 0.35,
         singleReed: {
           alpha: 0.5,
-          crowFreq: 1500,
-          openingFactor: 0.5,
         },
       },
       borePoint: [
@@ -2368,8 +2366,8 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(2);
-      expect(constraintList[0]!.type).toBe("DIMENSIONLESS");
-      expect(constraintList[1]!.type).toBe("DIMENSIONLESS");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONLESS");
+      expect(constraintList[1]!.type as string).toBe("DIMENSIONLESS");
     });
   });
 
@@ -2452,7 +2450,7 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(1);
-      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONAL");
     });
 
     test("value returns finite error", () => {
@@ -2571,7 +2569,7 @@ describe("Objective Functions", () => {
       const constraintList = constraints.getConstraints();
 
       expect(constraintList.length).toBe(1);
-      expect(constraintList[0]!.type).toBe("DIMENSIONAL");
+      expect(constraintList[0]!.type as string).toBe("DIMENSIONAL");
       expect(constraintList[0]!.name).toBe("Foot diameter");
     });
 
@@ -2689,7 +2687,7 @@ describe("Objective Functions", () => {
 
       expect(constraintList.length).toBe(3);
       for (const constraint of constraintList) {
-        expect(constraint.type).toBe("DIMENSIONLESS");
+        expect(constraint!.type as string).toBe("DIMENSIONLESS");
       }
     });
 
@@ -3297,6 +3295,8 @@ describe("Objective Functions", () => {
           length: 10,
           width: 8,
           height: 3,
+          airstreamLength: 8,
+          airstreamHeight: 2,
         },
       },
       borePoint: [
@@ -3367,6 +3367,8 @@ describe("Objective Functions", () => {
           length: 10,
           width: 8,
           height: 3,
+          airstreamLength: 8,
+          airstreamHeight: 2,
         },
       },
       borePoint: [

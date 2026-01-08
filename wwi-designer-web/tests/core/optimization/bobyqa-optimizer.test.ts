@@ -12,7 +12,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 1000);
 
       const result = optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [2, 3]
@@ -20,8 +20,8 @@ describe("BOBYQAOptimizer", () => {
 
       // Should make significant progress toward minimum
       expect(result.value).toBeLessThan(5); // Much better than initial 13
-      expect(Math.abs(result.point[0])).toBeLessThan(2.5);
-      expect(Math.abs(result.point[1])).toBeLessThan(2.5);
+      expect(Math.abs(result.point[0]!)).toBeLessThan(2.5);
+      expect(Math.abs(result.point[1]!)).toBeLessThan(2.5);
     });
 
     it("should minimize a shifted quadratic function", () => {
@@ -30,15 +30,15 @@ describe("BOBYQAOptimizer", () => {
 
       const result = optimizer.optimize(
         (point) =>
-          (point[0] - 1) * (point[0] - 1) + (point[1] - 2) * (point[1] - 2),
+          (point[0]! - 1) * (point[0]! - 1) + (point[1]! - 2) * (point[1]! - 2),
         [-5, -5],
         [5, 5],
         [0, 0]
       );
 
       expect(result.value).toBeLessThan(1); // Should get close to minimum
-      expect(Math.abs(result.point[0] - 1)).toBeLessThan(1);
-      expect(Math.abs(result.point[1] - 2)).toBeLessThan(1);
+      expect(Math.abs(result.point[0]! - 1)).toBeLessThan(1);
+      expect(Math.abs(result.point[1]! - 2)).toBeLessThan(1);
     });
 
     it("should handle 3D optimization", () => {
@@ -47,7 +47,7 @@ describe("BOBYQAOptimizer", () => {
 
       const result = optimizer.optimize(
         (point) =>
-          point[0] * point[0] + point[1] * point[1] + point[2] * point[2],
+          point[0]! * point[0]! + point[1]! * point[1]! + point[2]! * point[2]!,
         [-5, -5, -5],
         [5, 5, 5],
         [1, 2, 3]
@@ -64,14 +64,14 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 500);
 
       const result = optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [1, 1],
         [5, 5],
         [3, 3]
       );
 
-      expect(result.point[0]).toBeGreaterThanOrEqual(0.99);
-      expect(result.point[1]).toBeGreaterThanOrEqual(0.99);
+      expect(result.point[0]!).toBeGreaterThanOrEqual(0.99);
+      expect(result.point[1]!).toBeGreaterThanOrEqual(0.99);
     });
 
     it("should respect upper bounds", () => {
@@ -80,14 +80,14 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 500);
 
       const result = optimizer.optimize(
-        (point) => -point[0] - point[1],
+        (point) => -point[0]! - point[1]!,
         [0, 0],
         [2, 3],
         [1, 1]
       );
 
-      expect(result.point[0]).toBeLessThanOrEqual(2.01);
-      expect(result.point[1]).toBeLessThanOrEqual(3.01);
+      expect(result.point[0]!).toBeLessThanOrEqual(2.01);
+      expect(result.point[1]!).toBeLessThanOrEqual(3.01);
     });
 
     it("should find constrained minimum near bounds", () => {
@@ -97,15 +97,15 @@ describe("BOBYQAOptimizer", () => {
 
       const result = optimizer.optimize(
         (point) =>
-          (point[0] - 5) * (point[0] - 5) + (point[1] - 5) * (point[1] - 5),
+          (point[0]! - 5) * (point[0]! - 5) + (point[1]! - 5) * (point[1]! - 5),
         [0, 0],
         [2, 2],
         [1, 1]
       );
 
       // Should move toward the upper bounds (the constrained minimum)
-      expect(result.point[0]).toBeGreaterThan(0.8);
-      expect(result.point[1]).toBeGreaterThan(0.8);
+      expect(result.point[0]!).toBeGreaterThan(0.8);
+      expect(result.point[1]!).toBeGreaterThan(0.8);
     });
   });
 
@@ -114,7 +114,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 500);
 
       optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [2, 3]
@@ -129,7 +129,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, maxEvals);
 
       optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [2, 3]
@@ -146,14 +146,14 @@ describe("BOBYQAOptimizer", () => {
 
       // Both should find the minimum, but may take different paths
       const resultLarge = largeRadius.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [2, 3]
       );
 
       const resultSmall = smallRadius.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [2, 3]
@@ -169,7 +169,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(5, 1.0, 1e-6, 1000);
 
       const result = optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [2, 3]
@@ -184,7 +184,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 500);
 
       expect(() => {
-        optimizer.optimize((point) => point[0] * point[0], [-5], [5], [2]);
+        optimizer.optimize((point) => point[0]! * point[0]!, [-5], [5], [2]);
       }).toThrow(/at least 2 dimensions/);
     });
 
@@ -193,7 +193,7 @@ describe("BOBYQAOptimizer", () => {
 
       expect(() => {
         optimizer.optimize(
-          (point) => point[0] * point[0] + point[1] * point[1],
+          (point) => point[0]! * point[0]! + point[1]! * point[1]!,
           [5, 5], // Lower bounds higher than upper bounds
           [-5, -5],
           [0, 0]
@@ -207,7 +207,7 @@ describe("BOBYQAOptimizer", () => {
 
       expect(() => {
         optimizer.optimize(
-          (point) => point[0] * point[0] + point[1] * point[1],
+          (point) => point[0]! * point[0]! + point[1]! * point[1]!,
           [-5, -5],
           [5, 5],
           [2, 3]
@@ -223,8 +223,8 @@ describe("BOBYQAOptimizer", () => {
 
       const result = optimizer.optimize(
         (point) => {
-          const x = point[0];
-          const y = point[1];
+          const x = point[0]!;
+          const y = point[1]!;
           return (1 - x) * (1 - x) + 100 * (y - x * x) * (y - x * x);
         },
         [-5, -5],
@@ -244,7 +244,7 @@ describe("BOBYQAOptimizer", () => {
 
       const result = optimizer.optimize(
         (point) => {
-          return Math.sin(point[0]) + Math.sin(point[1]) + 2;
+          return Math.sin(point[0]!) + Math.sin(point[1]!) + 2;
         },
         [-3, -3],
         [3, 3],
@@ -263,7 +263,7 @@ describe("BOBYQAOptimizer", () => {
         (point) => {
           let sum = 0;
           for (let i = 0; i < point.length; i++) {
-            sum += (i + 1) * point[i] * point[i];
+            sum += (i + 1) * point[i]! * point[i]!;
           }
           return sum;
         },
@@ -282,7 +282,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 500);
 
       const result = optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-5, -5],
         [5, 5],
         [0, 0] // Start at optimal point
@@ -295,15 +295,15 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 0.1, 1e-6, 500);
 
       const result = optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-0.1, -0.1],
         [0.1, 0.1],
         [0.05, 0.05]
       );
 
       expect(result.value).toBeLessThan(0.01);
-      expect(Math.abs(result.point[0])).toBeLessThanOrEqual(0.11);
-      expect(Math.abs(result.point[1])).toBeLessThanOrEqual(0.11);
+      expect(Math.abs(result.point[0]!)).toBeLessThanOrEqual(0.11);
+      expect(Math.abs(result.point[1]!)).toBeLessThanOrEqual(0.11);
     });
 
     it("should handle asymmetric bounds", () => {
@@ -312,7 +312,7 @@ describe("BOBYQAOptimizer", () => {
       const optimizer = new BOBYQAOptimizer(undefined, 1.0, 1e-6, 1000);
 
       const result = optimizer.optimize(
-        (point) => point[0] * point[0] + point[1] * point[1],
+        (point) => point[0]! * point[0]! + point[1]! * point[1]!,
         [-1, -2],
         [10, 5],
         [5, 2]

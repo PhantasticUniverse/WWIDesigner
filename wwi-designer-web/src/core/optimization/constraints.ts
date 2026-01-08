@@ -105,6 +105,7 @@ export class Constraints {
   private objectiveDisplayName: string = "";
   private objectiveFunctionName: string = "";
   private constraintsName: string = "Default";
+  private holeGroups?: number[][];
 
   constructor(lengthType: LengthType = "MM") {
     this.lengthType = lengthType;
@@ -271,15 +272,14 @@ export class Constraints {
    * Set hole groups for grouped hole optimization.
    */
   setHoleGroups(groups: number[][]): void {
-    // Store hole groups (used by UI for constraint display)
-    (this as any).holeGroups = groups;
+    this.holeGroups = groups;
   }
 
   /**
    * Get hole groups for grouped hole optimization.
    */
   getHoleGroups(): number[][] | undefined {
-    return (this as any).holeGroups;
+    return this.holeGroups;
   }
 
   /**

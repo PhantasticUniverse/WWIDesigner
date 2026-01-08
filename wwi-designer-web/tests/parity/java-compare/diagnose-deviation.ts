@@ -55,7 +55,7 @@ async function main() {
   let count = 0;
 
   for (let i = 0; i < tuning.fingering.length; i++) {
-    const fingering = tuning.fingering[i];
+    const fingering = tuning.fingering[i]!;
     const predictedFingering = predicted.fingering[i];
     const noteName = fingering.note?.name || `Note ${i}`;
     const targetFreq = fingering.note?.frequency || 0;

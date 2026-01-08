@@ -5,7 +5,5 @@
  * acoustic modeling of woodwind instruments.
  */
 
-export {
-  PhysicalParameters,
-  type TemperatureType,
-} from "./physical-parameters.ts";
+export { PhysicalParameters } from "./physical-parameters.ts";
+// Note: TemperatureType is exported from constants.ts

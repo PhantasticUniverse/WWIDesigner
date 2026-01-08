@@ -213,9 +213,9 @@ export class DIRECTOptimizer {
     const width = new Array(this.dimension);
 
     for (let i = 0; i < this.dimension; i++) {
-      this.boundDifference[i] = this.upperBounds[i] - this.lowerBounds[i];
-      centre[i] = 0.5 * (this.upperBounds[i] + this.lowerBounds[i]);
-      width[i] = this.boundDifference[i] > 0 ? 1.0 : 0.0;
+      this.boundDifference[i] = this.upperBounds[i]! - this.lowerBounds[i]!;
+      centre[i] = 0.5 * (this.upperBounds[i]! + this.lowerBounds[i]!);
+      width[i] = this.boundDifference[i]! > 0 ? 1.0 : 0.0;
     }
 
     this.nextSerial = 0;
@@ -299,19 +299,19 @@ export class DIRECTOptimizer {
    * Update the long side information for a rectangle.
    */
   private updateLongSides(rect: RectangleValue): void {
-    rect.maxWidth = rect.width[0];
+    rect.maxWidth = rect.width[0]!;
     rect.longIdx = 0;
 
     for (let i = 1; i < rect.width.length; i++) {
-      if (rect.width[i] > rect.maxWidth) {
-        rect.maxWidth = rect.width[i];
+      if (rect.width[i]! > rect.maxWidth) {
+        rect.maxWidth = rect.width[i]!;
         rect.longIdx = i;
       }
     }
 
     rect.longCount = 0;
     for (let i = 0; i < rect.width.length; i++) {
-      if (rect.width[i] >= rect.maxWidth * (1.0 - EQUAL_SIDE_TOL)) {
+      if (rect.width[i]! >= rect.maxWidth * (1.0 - EQUAL_SIDE_TOL)) {
         rect.longCount++;
       }
     }
@@ -322,7 +322,7 @@ export class DIRECTOptimizer {
    */
   private isLongSide(rect: RectangleValue, i: number): boolean {
     if (i === rect.longIdx) return true;
-    return rect.width[i] >= rect.maxWidth * (1.0 - EQUAL_SIDE_TOL);
+    return rect.width[i]! >= rect.maxWidth * (1.0 - EQUAL_SIDE_TOL);
   }
 
   /**
@@ -330,7 +330,7 @@ export class DIRECTOptimizer {
    */
   private isSmall(rect: RectangleValue): boolean {
     for (let i = 0; i < rect.width.length; i++) {
-      if (rect.width[i] > this.convergenceXThreshold) {
+      if (rect.width[i]! > this.convergenceXThreshold) {
         return false;
       }
     }
@@ -343,8 +343,8 @@ export class DIRECTOptimizer {
   private rectangleDiameter(w: number[]): number {
     let sum = 0.0;
     for (let i = 0; i < w.length; i++) {
-      if (this.boundDifference[i] > 0) {
-        sum += w[i] * w[i];
+      if (this.boundDifference[i]! > 0) {
+        sum += w[i]! * w[i]!;
       }
     }
     // Round to float precision for grouping
@@ -469,14 +469,14 @@ export class DIRECTOptimizer {
       // Trisect all longest sides
       for (let i = 0; i < n; i++) {
         this.isort[i] = i;
-        if (eligibleSides.isEligibleSide[i]) {
-          const csave = c[i];
-          c[i] = csave - w[i] * THIRD * this.boundDifference[i];
+        if (eligibleSides.isEligibleSide[i]!) {
+          const csave = c[i]!;
+          c[i] = csave - w[i]! * THIRD * this.boundDifference[i]!;
           const newF1 = this.computeObjectiveValue(c);
           this.fv[2 * i] = newF1;
           if (this.isPromising(centreF, newF1, n)) nrPromising++;
 
-          c[i] = csave + w[i] * THIRD * this.boundDifference[i];
+          c[i] = csave + w[i]! * THIRD * this.boundDifference[i]!;
           const newF2 = this.computeObjectiveValue(c);
           this.fv[2 * i + 1] = newF2;
           if (this.isPromising(centreF, newF2, n)) nrPromising++;
@@ -490,18 +490,18 @@ export class DIRECTOptimizer {
 
       // Sort dimensions by minimum function value
       this.isort.sort((a, b) => {
-        const fv1 = Math.min(this.fv[2 * a], this.fv[2 * a + 1]);
-        const fv2 = Math.min(this.fv[2 * b], this.fv[2 * b + 1]);
+        const fv1 = Math.min(this.fv[2 * a]!, this.fv[2 * a + 1]!);
+        const fv2 = Math.min(this.fv[2 * b]!, this.fv[2 * b + 1]!);
         return fv1 - fv2;
       });
 
       // Remove and reinsert rectangles
       let thisRectKey = rectKey;
       for (let i = 0; i < eligibleSides.nrEligibleSides; i++) {
-        const dim = this.isort[i];
+        const dim = this.isort[i]!;
 
         // Shrink centre rectangle
-        w[dim] *= THIRD;
+        w[dim]! *= THIRD;
         this.rtree.delete(this.keyToString(thisRectKey));
         this.updateLongSides(rectangle);
         rectangle.width = [...w];
@@ -519,10 +519,10 @@ export class DIRECTOptimizer {
         // Insert new rectangles for side divisions
         const new_c1 = [...c];
         const new_w1 = [...w];
-        new_c1[dim] = c[dim] - w[dim] * this.boundDifference[dim];
+        new_c1[dim] = c[dim]! - w[dim]! * this.boundDifference[dim]!;
         const newKey1: RectangleKey = {
           diameter: thisRectKey.diameter,
-          fValue: this.fv[2 * dim],
+          fValue: this.fv[2 * dim]!,
           serial: ++this.nextSerial,
         };
         const newRect1 = this.createRectangleValue(new_c1, new_w1);
@@ -533,10 +533,10 @@ export class DIRECTOptimizer {
 
         const new_c2 = [...c];
         const new_w2 = [...w];
-        new_c2[dim] = c[dim] + w[dim] * this.boundDifference[dim];
+        new_c2[dim] = c[dim]! + w[dim]! * this.boundDifference[dim]!;
         const newKey2: RectangleKey = {
           diameter: thisRectKey.diameter,
-          fValue: this.fv[2 * dim + 1],
+          fValue: this.fv[2 * dim + 1]!,
           serial: ++this.nextSerial,
         };
         const newRect2 = this.createRectangleValue(new_c2, new_w2);
@@ -548,7 +548,7 @@ export class DIRECTOptimizer {
     } else {
       // Divide on single longest side
       const dim = eligibleSides.eligibleSide;
-      w[dim] *= THIRD;
+      w[dim]! *= THIRD;
 
       const newKey: RectangleKey = {
         diameter: this.rectangleDiameter(w),
@@ -564,7 +564,7 @@ export class DIRECTOptimizer {
       // Insert new rectangles
       const new_c1 = [...c];
       const new_w1 = [...w];
-      new_c1[dim] = c[dim] - w[dim] * this.boundDifference[dim];
+      new_c1[dim] = c[dim]! - w[dim]! * this.boundDifference[dim]!;
       const fv0 = this.computeObjectiveValue(new_c1);
       const newKey1: RectangleKey = {
         diameter: newKey.diameter,
@@ -577,7 +577,7 @@ export class DIRECTOptimizer {
 
       const new_c2 = [...c];
       const new_w2 = [...w];
-      new_c2[dim] = c[dim] + w[dim] * this.boundDifference[dim];
+      new_c2[dim] = c[dim]! + w[dim]! * this.boundDifference[dim]!;
       const fv1 = this.computeObjectiveValue(new_c2);
       const newKey2: RectangleKey = {
         diameter: newKey.diameter,
@@ -602,7 +602,7 @@ export class DIRECTOptimizer {
     const nhull = this.getPotentiallyOptimal();
 
     for (let i = 0; i < nhull; i++) {
-      const rect = this.hull[i];
+      const rect = this.hull[i]!;
       if (
         rect.key.diameter < convergenceDiameter &&
         this.isSmall(rect.value)
@@ -629,14 +629,14 @@ export class DIRECTOptimizer {
 
     if (entries.length === 0) return 0;
 
-    const xmax = entries[entries.length - 1].key.diameter;
+    const xmax = entries[entries.length - 1]!.key.diameter;
 
     // Find first entry with x == xmax
     let nmaxIdx = entries.length - 1;
-    while (nmaxIdx > 0 && entries[nmaxIdx - 1].key.diameter === xmax) {
+    while (nmaxIdx > 0 && entries[nmaxIdx - 1]!.key.diameter === xmax) {
       nmaxIdx--;
     }
-    const ymaxmin = entries[nmaxIdx].key.fValue;
+    const ymaxmin = entries[nmaxIdx]!.key.fValue;
 
     let nhull = 0;
     let xlast = 0;
@@ -644,7 +644,7 @@ export class DIRECTOptimizer {
     let minslope = (ymaxmin - ylast) / (xmax - xlast);
 
     for (let nIdx = 0; nIdx < nmaxIdx; nIdx++) {
-      const entry = entries[nIdx];
+      const entry = entries[nIdx]!;
       const k = entry.key;
 
       // Performance hack: skip vertical lines
@@ -653,7 +653,7 @@ export class DIRECTOptimizer {
           // Skip all points with higher y at same x
           while (
             nIdx + 1 < nmaxIdx &&
-            entries[nIdx + 1].key.diameter === xlast
+            entries[nIdx + 1]!.key.diameter === xlast
           ) {
             nIdx++;
           }
@@ -677,7 +677,7 @@ export class DIRECTOptimizer {
 
       // Remove points until we are making a "left turn"
       while (nhull >= 1) {
-        const t1 = this.hull[nhull - 1].key;
+        const t1 = this.hull[nhull - 1]!.key;
         const it2 = this.getPrunePoint(nhull, t1);
 
         if (it2 < 0) {
@@ -686,7 +686,7 @@ export class DIRECTOptimizer {
             break;
           }
         } else {
-          const t2 = this.hull[it2].key;
+          const t2 = this.hull[it2]!.key;
           // Cross product for left turn
           const cross =
             (t1.diameter - t2.diameter) * (k.fValue - t2.fValue) -
@@ -708,7 +708,7 @@ export class DIRECTOptimizer {
     // Include points at (xmax, ymaxmin)
     if (this.allowDuplicatesInHull) {
       for (let i = nmaxIdx; i < entries.length; i++) {
-        const entry = entries[i];
+        const entry = entries[i]!;
         if (
           entry.key.diameter === xmax &&
           entry.key.fValue === ymaxmin
@@ -720,8 +720,8 @@ export class DIRECTOptimizer {
     } else {
       this.ensureHullCapacity(nhull);
       this.hull[nhull++] = {
-        key: entries[nmaxIdx].key,
-        value: entries[nmaxIdx].value,
+        key: entries[nmaxIdx]!.key,
+        value: entries[nmaxIdx]!.value,
       };
     }
 
@@ -734,7 +734,7 @@ export class DIRECTOptimizer {
   private getPrunePoint(nhull: number, t1: RectangleKey): number {
     let it2 = nhull - 2;
     while (it2 >= 0) {
-      const t2 = this.hull[it2].key;
+      const t2 = this.hull[it2]!.key;
       if (t2.diameter !== t1.diameter || t2.fValue !== t1.fValue) {
         return it2;
       }

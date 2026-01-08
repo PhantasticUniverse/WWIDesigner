@@ -79,7 +79,7 @@ export abstract class AbstractRangeProcessor implements RandomVectorGenerator {
 
     // Calculate ranges
     for (let i = 0; i < vectorLength; i++) {
-      this.range[i] = upperBound[i] - lowerBound[i];
+      this.range[i] = upperBound[i]! - lowerBound[i]!;
     }
 
     // Determine which values to vary
@@ -109,7 +109,7 @@ export abstract class AbstractRangeProcessor implements RandomVectorGenerator {
   setStaticValues(startValues: number[]): void {
     for (let i = 0; i < this.lowVector.length; i++) {
       if (!this.valuesToVary[i]) {
-        this.lowVector[i] = startValues[i];
+        this.lowVector[i] = startValues[i]!;
         this.range[i] = 0; // No variation for static values
       }
     }
@@ -146,10 +146,10 @@ export class RandomRangeProcessor extends AbstractRangeProcessor {
     for (let i = 0; i < vectorLength; i++) {
       if (this.valuesToVary[i]) {
         // Generate random value in range: low + random(0,1) * range
-        vector[i] = this.lowVector[i] + this.range[i] * Math.random();
+        vector[i] = this.lowVector[i]! + this.range[i]! * Math.random();
       } else {
         // Keep static value
-        vector[i] = this.lowVector[i];
+        vector[i] = this.lowVector[i]!;
       }
     }
 
@@ -227,14 +227,14 @@ export class GridRangeProcessor extends AbstractRangeProcessor {
 
     // Set varying dimensions based on grid position
     for (let j = 0; j < this.varyingIndices.length; j++) {
-      const i = this.varyingIndices[j];
+      const i = this.varyingIndices[j]!;
       // Calculate position: low + (gridPoint / (gridPoints - 1)) * range
       // This distributes points evenly including endpoints
       const fraction =
         this.gridPointsPerDimension > 1
-          ? this.gridPoint[j] / (this.gridPointsPerDimension - 1)
+          ? this.gridPoint[j]! / (this.gridPointsPerDimension - 1)
           : 0.5;
-      vector[i] = this.lowVector[i] + fraction * this.range[i];
+      vector[i] = this.lowVector[i]! + fraction * this.range[i]!;
     }
 
     // Increment grid position (like a multi-digit counter)
@@ -249,8 +249,8 @@ export class GridRangeProcessor extends AbstractRangeProcessor {
    */
   private incrementGridPosition(): void {
     for (let j = 0; j < this.gridPoint.length; j++) {
-      this.gridPoint[j]++;
-      if (this.gridPoint[j] < this.gridPointsPerDimension) {
+      this.gridPoint[j]!++;
+      if (this.gridPoint[j]! < this.gridPointsPerDimension) {
         break; // No carry needed
       }
       this.gridPoint[j] = 0; // Carry to next dimension
@@ -300,7 +300,7 @@ export class LatinHypercubeRangeProcessor extends AbstractRangeProcessor {
       // Fisher-Yates shuffle
       for (let i = n - 1; i > 0; i--) {
         const randIdx = Math.floor(Math.random() * (i + 1));
-        [perm[i], perm[randIdx]] = [perm[randIdx], perm[i]];
+        [perm[i], perm[randIdx]] = [perm[randIdx]!, perm[i]!];
       }
       permutations.push(perm);
     }
@@ -321,13 +321,13 @@ export class LatinHypercubeRangeProcessor extends AbstractRangeProcessor {
 
       // Set varying dimensions using LHS
       for (let jIdx = 0; jIdx < varyingIndices.length; jIdx++) {
-        const j = varyingIndices[jIdx];
+        const j = varyingIndices[jIdx]!;
         // Sample within the stratum with random offset
-        const stratum = permutations[jIdx][i];
+        const stratum = permutations[jIdx]![i]!;
         const lower = stratum / n;
         const upper = (stratum + 1) / n;
         const fraction = lower + Math.random() * (upper - lower);
-        vector[j] = this.lowVector[j] + fraction * this.range[j];
+        vector[j] = this.lowVector[j]! + fraction * this.range[j]!;
       }
 
       this.samples.push(vector);
@@ -347,7 +347,7 @@ export class LatinHypercubeRangeProcessor extends AbstractRangeProcessor {
       this.sampleIndex = 0;
     }
 
-    const vector = this.samples![this.sampleIndex];
+    const vector = this.samples![this.sampleIndex]!;
     this.sampleIndex++;
     this.currentStart++;
 

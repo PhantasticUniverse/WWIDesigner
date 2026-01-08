@@ -46,7 +46,7 @@ async function main() {
   // Convert instrument to metres
   const mp = instrument.mouthpiece;
   const mpPosition = mp.position * INCH_TO_METRE;
-  const boreDiameter = instrument.borePoint[0].boreDiameter * INCH_TO_METRE;
+  const boreDiameter = instrument.borePoint[0]!.boreDiameter * INCH_TO_METRE;
   const radius = boreDiameter / 2;
 
   // Build headspace

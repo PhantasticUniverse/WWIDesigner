@@ -31,6 +31,7 @@ describe("BoreSectionCalculator", () => {
         length: 0.1,
         leftRadius: 0.01,
         rightRadius: 0.01,
+        rightBorePosition: 0.1,
       };
       const k = params.calcWaveNumber(440);
       const tm = calc.calcTransferMatrix(section, k, params);
@@ -44,6 +45,7 @@ describe("BoreSectionCalculator", () => {
         length: 0.1,
         leftRadius: 0.01,
         rightRadius: 0.01,
+        rightBorePosition: 0.1,
       };
       const k = params.calcWaveNumber(440);
       const tm = calc.calcTransferMatrix(section, k, params);
@@ -58,6 +60,7 @@ describe("BoreSectionCalculator", () => {
         length: 0.1,
         leftRadius: 0.01,
         rightRadius: 0.015,
+        rightBorePosition: 0.1,
       };
       const k = params.calcWaveNumber(440);
       const tm = calc.calcTransferMatrix(section, k, params);
@@ -81,6 +84,7 @@ describe("BoreSectionCalculator", () => {
         length: 0.1,
         leftRadius: 0.01,
         rightRadius: 0.01,
+        rightBorePosition: 0.1,
       };
       const k = params.calcWaveNumber(440);
       const tm = defaultBoreSectionCalculator.calcTransferMatrix(
@@ -178,7 +182,7 @@ describe("BoreSectionCalculator", () => {
 
     test("calculates transfer matrix for single section", () => {
       const sections: BoreSection[] = [
-        { length: 0.1, leftRadius: 0.01, rightRadius: 0.01 },
+        { length: 0.1, leftRadius: 0.01, rightRadius: 0.01, rightBorePosition: 0.1 },
       ];
       const k = params.calcWaveNumber(440);
       const tm = calcBoreTransferMatrix(sections, k, params);
@@ -189,9 +193,9 @@ describe("BoreSectionCalculator", () => {
 
     test("calculates transfer matrix for multiple sections", () => {
       const sections: BoreSection[] = [
-        { length: 0.05, leftRadius: 0.01, rightRadius: 0.011 },
-        { length: 0.05, leftRadius: 0.011, rightRadius: 0.012 },
-        { length: 0.05, leftRadius: 0.012, rightRadius: 0.012 },
+        { length: 0.05, leftRadius: 0.01, rightRadius: 0.011, rightBorePosition: 0.05 },
+        { length: 0.05, leftRadius: 0.011, rightRadius: 0.012, rightBorePosition: 0.1 },
+        { length: 0.05, leftRadius: 0.012, rightRadius: 0.012, rightBorePosition: 0.15 },
       ];
       const k = params.calcWaveNumber(440);
       const tm = calcBoreTransferMatrix(sections, k, params);
@@ -204,7 +208,7 @@ describe("BoreSectionCalculator", () => {
     test("uses custom calculator when provided", () => {
       const customCalc = new SimpleBoreSectionCalculator();
       const sections: BoreSection[] = [
-        { length: 0.1, leftRadius: 0.01, rightRadius: 0.01 },
+        { length: 0.1, leftRadius: 0.01, rightRadius: 0.01, rightBorePosition: 0.1 },
       ];
       const k = params.calcWaveNumber(440);
       const tm = calcBoreTransferMatrix(sections, k, params, customCalc);
@@ -214,8 +218,8 @@ describe("BoreSectionCalculator", () => {
 
     test("chaining is associative", () => {
       const sections: BoreSection[] = [
-        { length: 0.05, leftRadius: 0.01, rightRadius: 0.01 },
-        { length: 0.05, leftRadius: 0.01, rightRadius: 0.01 },
+        { length: 0.05, leftRadius: 0.01, rightRadius: 0.01, rightBorePosition: 0.05 },
+        { length: 0.05, leftRadius: 0.01, rightRadius: 0.01, rightBorePosition: 0.1 },
       ];
       const k = params.calcWaveNumber(440);
 

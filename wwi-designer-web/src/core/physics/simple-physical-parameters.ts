@@ -138,21 +138,21 @@ export class SimplePhysicalParameters {
     );
     const Xw = (relativeHumidity * f * Psv) / p;
 
-    let c = 331.45 - a[0] - p * a[6] - a[13] * p * p;
-    c = Math.sqrt(a[9] * a[9] + 4 * a[14] * c);
-    const Xc = (-a[9] - c) / (2 * a[14]);
+    let c = 331.45 - a[0]! - p * a[6]! - a[13]! * p * p;
+    c = Math.sqrt(a[9]! * a[9]! + 4 * a[14]! * c);
+    const Xc = (-a[9]! - c) / (2 * a[14]!);
 
     const speed =
-      a[0] +
-      a[1] * ambientTemp +
-      a[2] * ambientTemp * ambientTemp +
-      (a[3] + a[4] * ambientTemp + a[5] * ambientTemp * ambientTemp) * Xw +
-      (a[6] + a[7] * ambientTemp + a[8] * ambientTemp * ambientTemp) * p +
-      (a[9] + a[10] * ambientTemp + a[11] * ambientTemp * ambientTemp) * Xc +
-      a[12] * Xw * Xw +
-      a[13] * p * p +
-      a[14] * Xc * Xc +
-      a[15] * Xw * p * Xc;
+      a[0]! +
+      a[1]! * ambientTemp +
+      a[2]! * ambientTemp * ambientTemp +
+      (a[3]! + a[4]! * ambientTemp + a[5]! * ambientTemp * ambientTemp) * Xw +
+      (a[6]! + a[7]! * ambientTemp + a[8]! * ambientTemp * ambientTemp) * p +
+      (a[9]! + a[10]! * ambientTemp + a[11]! * ambientTemp * ambientTemp) * Xc +
+      a[12]! * Xw * Xw +
+      a[13]! * p * p +
+      a[14]! * Xc * Xc +
+      a[15]! * Xw * p * Xc;
 
     return speed;
   }

@@ -22,7 +22,7 @@ import type { IEvaluator } from "../../../src/core/optimization/evaluator.ts";
 import type { Tuning, Fingering } from "../../../src/models/tuning.ts";
 import type { IInstrumentCalculator } from "../../../src/core/modelling/instrument-calculator.ts";
 import type { Instrument } from "../../../src/models/instrument.ts";
-import type { PhysicalParameters } from "../../../src/core/physics/physical-parameters.ts";
+import { PhysicalParameters } from "../../../src/core/physics/physical-parameters.ts";
 
 describe("CMA-ES Optimizer - Basic Convergence", () => {
   test("finds minimum of sphere function in 2D", () => {
@@ -219,16 +219,16 @@ class MockEvaluator implements IEvaluator {
 /**
  * Mock calculator for testing.
  */
-class MockCalculator implements Partial<IInstrumentCalculator> {
+class MockCalculator {
   private mockInstrument: Partial<Instrument>;
 
   constructor() {
     this.mockInstrument = {
       name: "Test Instrument",
-      lengthType: "metric",
+      lengthType: "MM",
       borePoint: [
-        { position: 0, boreDiameter: 10 },
-        { position: 100, boreDiameter: 10 },
+        { borePosition: 0, boreDiameter: 10 },
+        { borePosition: 100, boreDiameter: 10 },
       ],
       hole: [],
     };
@@ -239,7 +239,7 @@ class MockCalculator implements Partial<IInstrumentCalculator> {
   }
 
   getParams(): PhysicalParameters {
-    return { temperature: 20, humidity: 50 } as PhysicalParameters;
+    return new PhysicalParameters(20, "C");
   }
 }
 
@@ -277,7 +277,7 @@ class CMAESTestObjective extends BaseObjectiveFunction {
   }
 
   // Override value to return simple quadratic
-  value(point: number[]): number {
+  override value(point: number[]): number {
     let sum = 0;
     for (let i = 0; i < point.length; i++) {
       sum += (point[i]! - this.targetValue[i]!) * (point[i]! - this.targetValue[i]!);
@@ -287,7 +287,7 @@ class CMAESTestObjective extends BaseObjectiveFunction {
 }
 
 describe("CMA-ES Optimizer - Integration with Objective Functions", () => {
-  const mockCalculator = new MockCalculator() as IInstrumentCalculator;
+  const mockCalculator = new MockCalculator() as unknown as IInstrumentCalculator;
   const mockTuning: Tuning = {
     name: "Test Tuning",
     numberOfHoles: 0,

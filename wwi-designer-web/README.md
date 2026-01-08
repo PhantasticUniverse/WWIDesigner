@@ -11,7 +11,7 @@ WWIDesigner Web calculates the acoustic behavior of wind instruments using the T
 - Compare instrument designs
 - Visualize bore profiles and hole placements
 
-**Key Achievement**: All acoustic calculations achieve **exact parity** with the original Java WWIDesigner code (803 tests passing, 1.41 cents average deviation identical to Java).
+**Key Achievement**: All acoustic calculations achieve **exact parity** with the original Java WWIDesigner code (810 tests passing, 1.41 cents average deviation identical to Java).
 
 ## Quick Start
 
@@ -27,6 +27,10 @@ bun run dev
 ```
 
 The web interface is available at http://localhost:3000
+
+### Security
+
+The server includes rate limiting, input validation, and session management for public deployment. See [CLAUDE.md](CLAUDE.md#security-features) for configuration details.
 
 ## Documentation
 
@@ -45,7 +49,19 @@ The web interface is available at http://localhost:3000
 
 ### Developer Notes
 
-See [CLAUDE.md](CLAUDE.md) for development guidelines, testing status, and Bun configuration.
+| Document | Description |
+|----------|-------------|
+| [CLAUDE.md](CLAUDE.md) | Main developer guide, API reference, Bun/TypeScript config |
+| [Development Guide](docs/DEVELOPMENT.md) | TypeScript patterns, testing, contributing |
+| [Java Parity](docs/JAVA_PARITY.md) | Complete Java class mapping and verification |
+
+### TypeScript
+
+The project uses strict TypeScript with `noUncheckedIndexedAccess` for maximum type safety:
+
+```bash
+bunx tsc --noEmit   # Type check (should show 0 errors)
+```
 
 ## Supported Instrument Types
 
@@ -156,7 +172,7 @@ bun test tests/parity/
 bun test tests/core/physical-parameters.test.ts
 ```
 
-**Test Summary**: 803 tests, including 68+ parity tests against Java output.
+**Test Summary**: 810 tests, including 68+ parity tests against Java output.
 
 ## References
 

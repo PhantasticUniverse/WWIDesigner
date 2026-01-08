@@ -13,14 +13,17 @@
  */
 
 /**
- * Immutable complex number class.
+ * Complex number class.
  * Represents a complex number z = re + im*i where i is the imaginary unit.
+ *
+ * Supports both immutable operations (add, multiply, etc.) that return new objects,
+ * and mutable in-place operations (addInPlace, multiplyInPlace, etc.) for performance.
  */
 export class Complex {
   /** Real part */
-  public readonly re: number;
+  public re: number;
   /** Imaginary part */
-  public readonly im: number;
+  public im: number;
 
   /** Complex zero: 0 + 0i */
   public static readonly ZERO = new Complex(0, 0);
@@ -363,10 +366,128 @@ export class Complex {
   }
 
   /**
-   * Create a copy of a complex number (for compatibility with Java code).
-   * Since Complex is immutable, this just returns a new instance with same values.
+   * Create a copy of a complex number.
    */
   static copy(z: Complex): Complex {
     return new Complex(z.re, z.im);
+  }
+
+  /**
+   * Create a mutable copy of this complex number.
+   * Useful for starting a chain of in-place operations.
+   */
+  copy(): Complex {
+    return new Complex(this.re, this.im);
+  }
+
+  // =========================================================================
+  // Mutable In-Place Operations (for performance in hot paths)
+  // =========================================================================
+
+  /**
+   * Set this complex number's values directly.
+   * @returns this for chaining
+   */
+  set(re: number, im: number): this {
+    this.re = re;
+    this.im = im;
+    return this;
+  }
+
+  /**
+   * Add another complex number or real number in place.
+   * @returns this for chaining
+   */
+  addInPlace(other: Complex | number): this {
+    if (typeof other === "number") {
+      this.re += other;
+    } else {
+      this.re += other.re;
+      this.im += other.im;
+    }
+    return this;
+  }
+
+  /**
+   * Subtract another complex number or real number in place.
+   * @returns this for chaining
+   */
+  subtractInPlace(other: Complex | number): this {
+    if (typeof other === "number") {
+      this.re -= other;
+    } else {
+      this.re -= other.re;
+      this.im -= other.im;
+    }
+    return this;
+  }
+
+  /**
+   * Multiply by another complex number or real number in place.
+   * @returns this for chaining
+   */
+  multiplyInPlace(other: Complex | number): this {
+    if (typeof other === "number") {
+      this.re *= other;
+      this.im *= other;
+    } else {
+      const newRe = this.re * other.re - this.im * other.im;
+      const newIm = this.re * other.im + this.im * other.re;
+      this.re = newRe;
+      this.im = newIm;
+    }
+    return this;
+  }
+
+  /**
+   * Divide by another complex number or real number in place.
+   * @returns this for chaining
+   */
+  divideInPlace(other: Complex | number): this {
+    if (typeof other === "number") {
+      this.re /= other;
+      this.im /= other;
+    } else {
+      const denominator = other.re * other.re + other.im * other.im;
+      if (denominator === 0) {
+        this.re = Number.NaN;
+        this.im = Number.NaN;
+      } else {
+        const newRe = (this.re * other.re + this.im * other.im) / denominator;
+        const newIm = (this.im * other.re - this.re * other.im) / denominator;
+        this.re = newRe;
+        this.im = newIm;
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Negate this complex number in place.
+   * @returns this for chaining
+   */
+  negateInPlace(): this {
+    this.re = -this.re;
+    this.im = -this.im;
+    return this;
+  }
+
+  /**
+   * Conjugate this complex number in place.
+   * @returns this for chaining
+   */
+  conjugateInPlace(): this {
+    this.im = -this.im;
+    return this;
+  }
+
+  /**
+   * Static helper to set a target Complex object's values.
+   * Useful for reusing scratch objects.
+   */
+  static set(target: Complex, re: number, im: number): Complex {
+    target.re = re;
+    target.im = im;
+    return target;
   }
 }

@@ -51,9 +51,9 @@ describe("buildHeadspace", () => {
     const headspace = buildHeadspace(instrument);
 
     expect(headspace).toHaveLength(1);
-    expect(headspace[0].length).toBeCloseTo(0.05, 6);
-    expect(headspace[0].leftRadius).toBeCloseTo(0.01, 6);
-    expect(headspace[0].rightRadius).toBeCloseTo(0.01, 6);
+    expect(headspace[0]!.length).toBeCloseTo(0.05, 6);
+    expect(headspace[0]!.leftRadius).toBeCloseTo(0.01, 6);
+    expect(headspace[0]!.rightRadius).toBeCloseTo(0.01, 6);
   });
 
   test("creates multiple sections when bore points are above mouthpiece", () => {
@@ -69,8 +69,8 @@ describe("buildHeadspace", () => {
 
     // Should have 2 sections: 0->0.03 and 0.03->0.05 (partial)
     expect(headspace).toHaveLength(2);
-    expect(headspace[0].length).toBeCloseTo(0.03, 6);
-    expect(headspace[1].length).toBeCloseTo(0.02, 6);
+    expect(headspace[0]!.length).toBeCloseTo(0.03, 6);
+    expect(headspace[1]!.length).toBeCloseTo(0.02, 6);
   });
 
   test("handles negative bore point positions", () => {
@@ -86,7 +86,7 @@ describe("buildHeadspace", () => {
 
     expect(headspace).toHaveLength(1);
     // Length should be from -0.01 to 0.05 = 0.06
-    expect(headspace[0].length).toBeCloseTo(0.06, 6);
+    expect(headspace[0]!.length).toBeCloseTo(0.06, 6);
   });
 
   test("interpolates diameter for partial section", () => {
@@ -101,7 +101,7 @@ describe("buildHeadspace", () => {
 
     expect(headspace).toHaveLength(1);
     // At 50% of the way, diameter should be 0.025
-    expect(headspace[0].rightRadius).toBeCloseTo(0.0125, 6);
+    expect(headspace[0]!.rightRadius).toBeCloseTo(0.0125, 6);
   });
 
   test("returns empty array when all bore points are below mouthpiece", () => {

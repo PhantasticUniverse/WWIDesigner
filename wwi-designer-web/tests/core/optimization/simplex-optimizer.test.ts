@@ -22,7 +22,7 @@ import type { IEvaluator } from "../../../src/core/optimization/evaluator.ts";
 import type { Tuning, Fingering } from "../../../src/models/tuning.ts";
 import type { IInstrumentCalculator } from "../../../src/core/modelling/instrument-calculator.ts";
 import type { Instrument } from "../../../src/models/instrument.ts";
-import type { PhysicalParameters } from "../../../src/core/physics/physical-parameters.ts";
+import { PhysicalParameters } from "../../../src/core/physics/physical-parameters.ts";
 
 describe("Simplex Optimizer - Basic Convergence", () => {
   test("finds minimum of sphere function in 2D", () => {
@@ -109,8 +109,8 @@ describe("Simplex Optimizer - Configuration", () => {
       [5, 5],
       [0.1, 0.1], // Start close to optimum
       {
-        functionTolerance: 1e-8,
-        pointTolerance: 1e-8,
+        relativeTolerance: 1e-8,
+        absoluteTolerance: 1e-8,
         maxEvaluations: 5000
       }
     );
@@ -227,10 +227,10 @@ class MockCalculator implements Partial<IInstrumentCalculator> {
   constructor() {
     this.mockInstrument = {
       name: "Test Instrument",
-      lengthType: "metric",
+      lengthType: "MM",
       borePoint: [
-        { position: 0, boreDiameter: 10 },
-        { position: 100, boreDiameter: 10 },
+        { borePosition: 0, boreDiameter: 10 },
+        { borePosition: 100, boreDiameter: 10 },
       ],
       hole: [],
     };
@@ -241,7 +241,7 @@ class MockCalculator implements Partial<IInstrumentCalculator> {
   }
 
   getParams(): PhysicalParameters {
-    return { temperature: 20, humidity: 50 } as PhysicalParameters;
+    return new PhysicalParameters(20, "C");
   }
 }
 
@@ -279,7 +279,7 @@ class SimplexTestObjective extends BaseObjectiveFunction {
   }
 
   // Override value to return simple quadratic
-  value(point: number[]): number {
+  override value(point: number[]): number {
     let sum = 0;
     for (let i = 0; i < point.length; i++) {
       sum += (point[i]! - this.targetValue[i]!) * (point[i]! - this.targetValue[i]!);
@@ -289,7 +289,7 @@ class SimplexTestObjective extends BaseObjectiveFunction {
 }
 
 describe("Simplex Optimizer - Integration with Objective Functions", () => {
-  const mockCalculator = new MockCalculator() as IInstrumentCalculator;
+  const mockCalculator = new MockCalculator() as unknown as IInstrumentCalculator;
   const mockTuning: Tuning = {
     name: "Test Tuning",
     numberOfHoles: 0,

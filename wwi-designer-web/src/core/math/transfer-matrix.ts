@@ -49,6 +49,16 @@ export class TransferMatrix {
   /** Volume flow-to-volume flow coefficient */
   private mUU: Complex;
 
+  // Scratch objects for optimized multiply operations (reduces allocations)
+  private static readonly scratch1 = new Complex(0, 0);
+  private static readonly scratch2 = new Complex(0, 0);
+  private static readonly scratch3 = new Complex(0, 0);
+  private static readonly scratch4 = new Complex(0, 0);
+  private static readonly scratch5 = new Complex(0, 0);
+  private static readonly scratch6 = new Complex(0, 0);
+  private static readonly scratch7 = new Complex(0, 0);
+  private static readonly scratch8 = new Complex(0, 0);
+
   /**
    * Create a transfer matrix. Default is identity matrix.
    */
@@ -114,6 +124,52 @@ export class TransferMatrix {
       this.mUP.multiply(rhs.mPP).add(this.mUU.multiply(rhs.mUP)),
       this.mUP.multiply(rhs.mPU).add(this.mUU.multiply(rhs.mUU))
     );
+  }
+
+  /**
+   * Multiply this matrix by another on the right, in place.
+   * Uses scratch objects to minimize allocations.
+   * @param rhs Right-hand side matrix
+   * @returns this (modified) for chaining
+   */
+  multiplyInPlace(rhs: TransferMatrix): this {
+    const s1 = TransferMatrix.scratch1;
+    const s2 = TransferMatrix.scratch2;
+    const s3 = TransferMatrix.scratch3;
+    const s4 = TransferMatrix.scratch4;
+
+    // Compute new values using scratch objects
+    // newPP = this.mPP * rhs.mPP + this.mPU * rhs.mUP
+    s1.set(this.mPP.re, this.mPP.im).multiplyInPlace(rhs.mPP);
+    s2.set(this.mPU.re, this.mPU.im).multiplyInPlace(rhs.mUP);
+    const newPPre = s1.re + s2.re;
+    const newPPim = s1.im + s2.im;
+
+    // newPU = this.mPP * rhs.mPU + this.mPU * rhs.mUU
+    s1.set(this.mPP.re, this.mPP.im).multiplyInPlace(rhs.mPU);
+    s2.set(this.mPU.re, this.mPU.im).multiplyInPlace(rhs.mUU);
+    const newPUre = s1.re + s2.re;
+    const newPUim = s1.im + s2.im;
+
+    // newUP = this.mUP * rhs.mPP + this.mUU * rhs.mUP
+    s3.set(this.mUP.re, this.mUP.im).multiplyInPlace(rhs.mPP);
+    s4.set(this.mUU.re, this.mUU.im).multiplyInPlace(rhs.mUP);
+    const newUPre = s3.re + s4.re;
+    const newUPim = s3.im + s4.im;
+
+    // newUU = this.mUP * rhs.mPU + this.mUU * rhs.mUU
+    s3.set(this.mUP.re, this.mUP.im).multiplyInPlace(rhs.mPU);
+    s4.set(this.mUU.re, this.mUU.im).multiplyInPlace(rhs.mUU);
+    const newUUre = s3.re + s4.re;
+    const newUUim = s3.im + s4.im;
+
+    // Update this matrix
+    this.mPP.set(newPPre, newPPim);
+    this.mPU.set(newPUre, newPUim);
+    this.mUP.set(newUPre, newUPim);
+    this.mUU.set(newUUre, newUUim);
+
+    return this;
   }
 
   /**

@@ -86,7 +86,7 @@ function traceJavaCalculation(
   console.log(`\nJYC calculation (bore-section):`);
   console.log(`  headspace sections: ${headspace.length}`);
   if (headspace.length > 0) {
-    console.log(`  section[0]: length=${headspace[0].length.toFixed(10)}, r=${headspace[0].leftRadius.toFixed(10)}`);
+    console.log(`  section[0]: length=${headspace[0]!.length.toFixed(10)}, r=${headspace[0]!.leftRadius.toFixed(10)}`);
   }
   console.log(`  raw volume: ${hsVolume.toExponential(15)} m³`);
   console.log(`  volume * 2: ${hsVolumeTimesTwo.toExponential(15)} m³`);
@@ -216,7 +216,7 @@ async function main() {
   console.log(`boreDiameter: ${mouthpiece.boreDiameter?.toFixed(10)} m`);
   console.log(`headspace sections: ${headspace.length}`);
   if (headspace.length > 0) {
-    const hs = headspace[0];
+    const hs = headspace[0]!;
     console.log(`  [0] length: ${hs.length.toFixed(10)} m, leftR: ${hs.leftRadius.toFixed(10)}, rightR: ${hs.rightRadius.toFixed(10)}`);
   }
 

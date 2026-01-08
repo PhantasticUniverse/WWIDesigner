@@ -179,7 +179,7 @@ export class BOBYQAOptimizer {
   private calculateInitialRadius(): number {
     let maxRange = 0;
     for (let i = 0; i < this.n; i++) {
-      const range = this.upperBounds[i] - this.lowerBounds[i];
+      const range = this.upperBounds[i]! - this.lowerBounds[i]!;
       if (range > maxRange) {
         maxRange = range;
       }
@@ -206,7 +206,7 @@ export class BOBYQAOptimizer {
     }
 
     for (let i = 0; i < this.n; i++) {
-      if (this.lowerBounds[i] >= this.upperBounds[i]) {
+      if (this.lowerBounds[i]! >= this.upperBounds[i]!) {
         throw new Error(`Invalid bounds at dimension ${i}`);
       }
     }
@@ -218,11 +218,11 @@ export class BOBYQAOptimizer {
   private adjustToBounds(point: number[]): number[] {
     const adjusted = [...point];
     for (let i = 0; i < this.n; i++) {
-      const lb = this.lowerBounds[i];
-      const ub = this.upperBounds[i];
+      const lb = this.lowerBounds[i]!;
+      const ub = this.upperBounds[i]!;
       // Ensure point is within bounds with small margin
       const margin = Math.min(0.001 * (ub - lb), this.trustRegionRadius);
-      adjusted[i] = Math.max(lb + margin, Math.min(ub - margin, adjusted[i]));
+      adjusted[i] = Math.max(lb + margin, Math.min(ub - margin, adjusted[i]!));
     }
     return adjusted;
   }
@@ -240,8 +240,8 @@ export class BOBYQAOptimizer {
     const boundedPoint = [...point];
     for (let i = 0; i < this.n; i++) {
       boundedPoint[i] = Math.max(
-        this.lowerBounds[i],
-        Math.min(this.upperBounds[i], boundedPoint[i])
+        this.lowerBounds[i]!,
+        Math.min(this.upperBounds[i]!, boundedPoint[i]!)
       );
     }
 
@@ -309,9 +309,9 @@ export class BOBYQAOptimizer {
         const newPoint = this.newPoint.slice();
         for (let i = 0; i < this.n; i++) {
           newPoint[i] =
-            this.originShift[i] +
-            this.trustRegionCenterOffset[i] +
-            trustRegionStep[i];
+            this.originShift[i]! +
+            this.trustRegionCenterOffset[i]! +
+            trustRegionStep[i]!;
         }
 
         // Evaluate at the new point
@@ -326,7 +326,7 @@ export class BOBYQAOptimizer {
         // Calculate improvement ratio
         const predictedReduction = this.calculatePredictedReduction(trustRegionStep);
         const actualReduction =
-          this.functionValues[this.getKnownBestIndex()] - newValue;
+          this.functionValues[this.getKnownBestIndex()]! - newValue;
         const ratio =
           Math.abs(predictedReduction) > SMALL
             ? actualReduction / predictedReduction
@@ -353,7 +353,7 @@ export class BOBYQAOptimizer {
           this.updateModel(trustRegionStep, newPoint, newValue);
 
           // If we made significant progress, rebuild interpolation around new center
-          if (actualReduction > 0.1 * this.functionValues[this.getKnownBestIndex()] ||
+          if (actualReduction > 0.1 * this.functionValues[this.getKnownBestIndex()]! ||
               stepLength > 0.5 * this.trustRegionRadius) {
             // Shift origin to new best point and rebuild interpolation
             this.recenterInterpolation();
@@ -370,20 +370,20 @@ export class BOBYQAOptimizer {
 
     // Return best point found
     const bestIndex = this.getKnownBestIndex();
-    const bestPoint = new Array(this.n);
+    const bestPoint = new Array<number>(this.n);
     for (let i = 0; i < this.n; i++) {
       bestPoint[i] =
-        this.originShift[i] + this.interpolationPoints[bestIndex][i];
+        this.originShift[i]! + this.interpolationPoints[bestIndex]![i]!;
       // Ensure within bounds
       bestPoint[i] = Math.max(
-        this.lowerBounds[i],
-        Math.min(this.upperBounds[i], bestPoint[i])
+        this.lowerBounds[i]!,
+        Math.min(this.upperBounds[i]!, bestPoint[i]!)
       );
     }
 
     return {
       point: this.currentBest?.point ?? bestPoint,
-      value: this.currentBest?.value ?? this.functionValues[bestIndex],
+      value: this.currentBest?.value ?? this.functionValues[bestIndex]!,
       evaluations: this.evaluations,
       iterations,
       converged,
@@ -433,14 +433,14 @@ export class BOBYQAOptimizer {
     for (let i = 0; i < this.n && pointIndex < this.npt; i++) {
       // Point in positive direction
       if (pointIndex < this.npt) {
-        this.interpolationPoints[pointIndex][i] = stepSize;
+        this.interpolationPoints[pointIndex]![i] = stepSize;
         this.clampInterpolationPoint(pointIndex);
         pointIndex++;
       }
 
       // Point in negative direction
       if (pointIndex < this.npt) {
-        this.interpolationPoints[pointIndex][i] = -stepSize;
+        this.interpolationPoints[pointIndex]![i] = -stepSize;
         this.clampInterpolationPoint(pointIndex);
         pointIndex++;
       }
@@ -450,8 +450,8 @@ export class BOBYQAOptimizer {
     for (let i = 0; i < this.n && pointIndex < this.npt; i++) {
       for (let j = i + 1; j < this.n && pointIndex < this.npt; j++) {
         // Diagonal point
-        this.interpolationPoints[pointIndex][i] = stepSize;
-        this.interpolationPoints[pointIndex][j] = stepSize;
+        this.interpolationPoints[pointIndex]![i] = stepSize;
+        this.interpolationPoints[pointIndex]![j] = stepSize;
         this.clampInterpolationPoint(pointIndex);
         pointIndex++;
       }
@@ -459,9 +459,9 @@ export class BOBYQAOptimizer {
 
     // Evaluate function at all interpolation points
     for (let k = 0; k < this.npt; k++) {
-      const point = new Array(this.n);
+      const point = new Array<number>(this.n);
       for (let i = 0; i < this.n; i++) {
-        point[i] = this.originShift[i] + this.interpolationPoints[k][i];
+        point[i] = this.originShift[i]! + this.interpolationPoints[k]![i]!;
       }
       try {
         this.functionValues[k] = this.evaluate(point);
@@ -478,11 +478,11 @@ export class BOBYQAOptimizer {
    */
   private clampInterpolationPoint(index: number): void {
     for (let i = 0; i < this.n; i++) {
-      const lb = this.lowerBounds[i] - this.originShift[i];
-      const ub = this.upperBounds[i] - this.originShift[i];
-      this.interpolationPoints[index][i] = Math.max(
+      const lb = this.lowerBounds[i]! - this.originShift[i]!;
+      const ub = this.upperBounds[i]! - this.originShift[i]!;
+      this.interpolationPoints[index]![i] = Math.max(
         lb,
-        Math.min(ub, this.interpolationPoints[index][i])
+        Math.min(ub, this.interpolationPoints[index]![i]!)
       );
     }
   }
@@ -495,7 +495,7 @@ export class BOBYQAOptimizer {
     const bestIndex = this.getKnownBestIndex();
     for (let i = 0; i < this.n; i++) {
       this.trustRegionCenterOffset[i] =
-        this.interpolationPoints[bestIndex][i];
+        this.interpolationPoints[bestIndex]![i]!;
     }
 
     // Initialize B matrix and Z matrix for the Lagrange interpolation
@@ -517,12 +517,12 @@ export class BOBYQAOptimizer {
     // Reset matrices
     for (let k = 0; k < npt + n; k++) {
       for (let j = 0; j < n; j++) {
-        this.bMatrix[k][j] = 0;
+        this.bMatrix[k]![j] = 0;
       }
     }
     for (let k = 0; k < npt; k++) {
       for (let j = 0; j < nptm; j++) {
-        this.zMatrix[k][j] = 0;
+        this.zMatrix[k]![j] = 0;
       }
     }
 
@@ -537,7 +537,7 @@ export class BOBYQAOptimizer {
 
     // Estimate gradient and Hessian from interpolation points
     // Using simple finite differences from the center point
-    const f0 = this.functionValues[0]; // Value at center
+    const f0 = this.functionValues[0]!; // Value at center
 
     // For each coordinate direction
     for (let i = 0; i < n && 2 * i + 2 < npt; i++) {
@@ -545,10 +545,10 @@ export class BOBYQAOptimizer {
       const km = 2 * i + 2; // Index of point in -direction
 
       if (kp < npt && km < npt) {
-        const xp = this.interpolationPoints[kp][i];
-        const xm = this.interpolationPoints[km][i];
-        const fp = this.functionValues[kp];
-        const fm = this.functionValues[km];
+        const xp = this.interpolationPoints[kp]![i]!;
+        const xm = this.interpolationPoints[km]![i]!;
+        const fp = this.functionValues[kp]!;
+        const fm = this.functionValues[km]!;
 
         // Estimate gradient: g_i ≈ (f+ - f-) / (x+ - x-)
         if (Math.abs(xp - xm) > SMALL) {
@@ -575,7 +575,7 @@ export class BOBYQAOptimizer {
   private updateGradient(): void {
     const n = this.n;
     const bestIndex = this.getKnownBestIndex();
-    const fopt = this.functionValues[bestIndex];
+    const fopt = this.functionValues[bestIndex]!;
     const centerOffset = this.trustRegionCenterOffset;
 
     // Initialize gradient to zero
@@ -592,19 +592,19 @@ export class BOBYQAOptimizer {
 
       // Look for points that differ primarily in coordinate i
       for (let k = 0; k < this.npt; k++) {
-        const xk = this.interpolationPoints[k];
-        const fk = this.functionValues[k];
+        const xk = this.interpolationPoints[k]!;
+        const fk = this.functionValues[k]!;
 
         // Check if this point is offset from center mainly in direction i
         let isAlongAxis = true;
-        let diff_i = xk[i] - centerOffset[i];
+        let diff_i = xk[i]! - centerOffset[i]!;
 
         if (Math.abs(diff_i) < SMALL) continue; // Point is at center in this direction
 
         // Check other coordinates are close to center
         for (let j = 0; j < n; j++) {
           if (j !== i) {
-            const diff_j = xk[j] - centerOffset[j];
+            const diff_j = xk[j]! - centerOffset[j]!;
             if (Math.abs(diff_j) > 0.5 * Math.abs(diff_i)) {
               isAlongAxis = false;
               break;
@@ -635,12 +635,12 @@ export class BOBYQAOptimizer {
    */
   private recenterInterpolation(): void {
     const bestIndex = this.getKnownBestIndex();
-    const bestValue = this.functionValues[bestIndex];
+    const bestValue = this.functionValues[bestIndex]!;
 
     // Get the absolute position of the best point
-    const bestPoint = new Array(this.n);
+    const bestPoint = new Array<number>(this.n);
     for (let i = 0; i < this.n; i++) {
-      bestPoint[i] = this.originShift[i] + this.interpolationPoints[bestIndex][i];
+      bestPoint[i] = this.originShift[i]! + this.interpolationPoints[bestIndex]![i]!;
     }
 
     // Update origin shift to new best point
@@ -649,7 +649,7 @@ export class BOBYQAOptimizer {
     // Reset interpolation points around new origin
     for (let k = 0; k < this.npt; k++) {
       for (let i = 0; i < this.n; i++) {
-        this.interpolationPoints[k][i] = 0;
+        this.interpolationPoints[k]![i] = 0;
       }
     }
 
@@ -663,14 +663,14 @@ export class BOBYQAOptimizer {
     for (let i = 0; i < this.n && pointIndex < this.npt; i++) {
       // Point in positive direction
       if (pointIndex < this.npt) {
-        this.interpolationPoints[pointIndex][i] = stepSize;
+        this.interpolationPoints[pointIndex]![i] = stepSize;
         this.clampInterpolationPoint(pointIndex);
 
         // Only evaluate if the point actually moved
-        if (Math.abs(this.interpolationPoints[pointIndex][i]) > SMALL) {
-          const point = new Array(this.n);
+        if (Math.abs(this.interpolationPoints[pointIndex]![i]!) > SMALL) {
+          const point = new Array<number>(this.n);
           for (let j = 0; j < this.n; j++) {
-            point[j] = this.originShift[j] + this.interpolationPoints[pointIndex][j];
+            point[j] = this.originShift[j]! + this.interpolationPoints[pointIndex]![j]!;
           }
           try {
             this.functionValues[pointIndex] = this.evaluate(point);
@@ -685,13 +685,13 @@ export class BOBYQAOptimizer {
 
       // Point in negative direction
       if (pointIndex < this.npt) {
-        this.interpolationPoints[pointIndex][i] = -stepSize;
+        this.interpolationPoints[pointIndex]![i] = -stepSize;
         this.clampInterpolationPoint(pointIndex);
 
-        if (Math.abs(this.interpolationPoints[pointIndex][i]) > SMALL) {
-          const point = new Array(this.n);
+        if (Math.abs(this.interpolationPoints[pointIndex]![i]!) > SMALL) {
+          const point = new Array<number>(this.n);
           for (let j = 0; j < this.n; j++) {
-            point[j] = this.originShift[j] + this.interpolationPoints[pointIndex][j];
+            point[j] = this.originShift[j]! + this.interpolationPoints[pointIndex]![j]!;
           }
           try {
             this.functionValues[pointIndex] = this.evaluate(point);
@@ -726,7 +726,7 @@ export class BOBYQAOptimizer {
   private updateHessianDiagonal(): void {
     const n = this.n;
     const bestIndex = this.getKnownBestIndex();
-    const f0 = this.functionValues[bestIndex];
+    const f0 = this.functionValues[bestIndex]!;
     const centerOffset = this.trustRegionCenterOffset;
     const hqSize = (n * (n + 1)) / 2;
 
@@ -743,15 +743,15 @@ export class BOBYQAOptimizer {
       let deltaM = 0;
 
       for (let k = 0; k < this.npt; k++) {
-        const xk = this.interpolationPoints[k];
-        const fk = this.functionValues[k];
-        const diff_i = xk[i] - centerOffset[i];
+        const xk = this.interpolationPoints[k]!;
+        const fk = this.functionValues[k]!;
+        const diff_i = xk[i]! - centerOffset[i]!;
 
         // Check if primarily along axis i
         let isAlongAxis = true;
         for (let j = 0; j < n; j++) {
           if (j !== i) {
-            const diff_j = xk[j] - centerOffset[j];
+            const diff_j = xk[j]! - centerOffset[j]!;
             if (Math.abs(diff_j) > 0.1 * this.trustRegionRadius) {
               isAlongAxis = false;
               break;
@@ -789,17 +789,17 @@ export class BOBYQAOptimizer {
    */
   private findTrustRegionStep(): number[] {
     const n = this.n;
-    const step = new Array(n).fill(0);
+    const step = new Array<number>(n).fill(0);
 
     // Get bounds relative to current trust region center
-    const stepLower = new Array(n);
-    const stepUpper = new Array(n);
+    const stepLower = new Array<number>(n);
+    const stepUpper = new Array<number>(n);
 
     for (let i = 0; i < n; i++) {
       const lb =
-        this.lowerBounds[i] - this.originShift[i] - this.trustRegionCenterOffset[i];
+        this.lowerBounds[i]! - this.originShift[i]! - this.trustRegionCenterOffset[i]!;
       const ub =
-        this.upperBounds[i] - this.originShift[i] - this.trustRegionCenterOffset[i];
+        this.upperBounds[i]! - this.originShift[i]! - this.trustRegionCenterOffset[i]!;
       stepLower[i] = Math.max(lb, -this.trustRegionRadius);
       stepUpper[i] = Math.min(ub, this.trustRegionRadius);
     }
@@ -819,13 +819,13 @@ export class BOBYQAOptimizer {
     // Try to compute Newton step (minimizer of quadratic model)
     // For simplicity, use diagonal Hessian approximation
     let useNewton = true;
-    const newtonStep = new Array(n);
+    const newtonStep = new Array<number>(n);
 
     for (let i = 0; i < n; i++) {
       const hii = this.getModelHessianElement(i, i);
       if (hii > SMALL) {
         // Newton step: d = -H^{-1} g
-        newtonStep[i] = -gradient[i] / hii;
+        newtonStep[i] = -gradient[i]! / hii;
       } else {
         // Hessian is not positive definite in this direction
         useNewton = false;
@@ -839,13 +839,13 @@ export class BOBYQAOptimizer {
       if (newtonNorm <= this.trustRegionRadius) {
         // Newton step is within trust region - use it (bounded)
         for (let i = 0; i < n; i++) {
-          step[i] = Math.max(stepLower[i], Math.min(stepUpper[i], newtonStep[i]));
+          step[i] = Math.max(stepLower[i]!, Math.min(stepUpper[i]!, newtonStep[i]!));
         }
       } else {
         // Scale Newton step to trust region boundary
         const scale = this.trustRegionRadius / newtonNorm;
         for (let i = 0; i < n; i++) {
-          step[i] = Math.max(stepLower[i], Math.min(stepUpper[i], scale * newtonStep[i]));
+          step[i] = Math.max(stepLower[i]!, Math.min(stepUpper[i]!, scale * newtonStep[i]!));
         }
       }
     } else {
@@ -854,7 +854,7 @@ export class BOBYQAOptimizer {
       let gHg = 0;
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
-          gHg += gradient[i] * this.getModelHessianElement(i, j) * gradient[j];
+          gHg += gradient[i]! * this.getModelHessianElement(i, j) * gradient[j]!;
         }
       }
 
@@ -870,8 +870,8 @@ export class BOBYQAOptimizer {
       alpha = Math.min(alpha, this.trustRegionRadius / gradNorm);
 
       for (let i = 0; i < n; i++) {
-        const unboundedStep = -alpha * gradient[i];
-        step[i] = Math.max(stepLower[i], Math.min(stepUpper[i], unboundedStep));
+        const unboundedStep = -alpha * gradient[i]!;
+        step[i] = Math.max(stepLower[i]!, Math.min(stepUpper[i]!, unboundedStep));
       }
     }
 
@@ -880,7 +880,7 @@ export class BOBYQAOptimizer {
 
     // Store the new point for later use
     for (let i = 0; i < n; i++) {
-      this.newPoint[i] = step[i];
+      this.newPoint[i] = step[i]!;
     }
 
     return step;
@@ -899,11 +899,11 @@ export class BOBYQAOptimizer {
 
     for (let iter = 0; iter < 20; iter++) {
       // Compute gradient of the quadratic model at current step
-      const modelGrad = new Array(n);
+      const modelGrad = new Array<number>(n);
       for (let i = 0; i < n; i++) {
-        modelGrad[i] = gradient[i];
+        modelGrad[i] = gradient[i]!;
         for (let j = 0; j < n; j++) {
-          modelGrad[i] += this.getModelHessianElement(i, j) * step[j];
+          modelGrad[i]! += this.getModelHessianElement(i, j) * step[j]!;
         }
       }
 
@@ -912,14 +912,14 @@ export class BOBYQAOptimizer {
       const stepSize = 0.1 * this.trustRegionRadius;
 
       for (let i = 0; i < n; i++) {
-        const newStep = step[i] - stepSize * modelGrad[i];
-        const projectedStep = Math.max(stepLower[i], Math.min(stepUpper[i], newStep));
+        const newStep = step[i]! - stepSize * modelGrad[i]!;
+        const projectedStep = Math.max(stepLower[i]!, Math.min(stepUpper[i]!, newStep));
 
         // Check trust region constraint
         const testStep = [...step];
         testStep[i] = projectedStep;
         if (this.vectorNorm(testStep) <= this.trustRegionRadius * 1.01) {
-          if (Math.abs(projectedStep - step[i]) > SMALL * this.trustRegionRadius) {
+          if (Math.abs(projectedStep - step[i]!) > SMALL * this.trustRegionRadius) {
             step[i] = projectedStep;
             improved = true;
           }
@@ -940,7 +940,7 @@ export class BOBYQAOptimizer {
 
     // Linear term: g' * d
     for (let i = 0; i < this.n; i++) {
-      reduction -= this.gradientAtTrustRegionCenter[i] * step[i];
+      reduction -= this.gradientAtTrustRegionCenter[i]! * step[i]!;
     }
 
     // Quadratic term: 0.5 * d' * H * d (from the model)
@@ -948,7 +948,7 @@ export class BOBYQAOptimizer {
     for (let i = 0; i < this.n; i++) {
       for (let j = 0; j < this.n; j++) {
         const hessianElement = this.getModelHessianElement(i, j);
-        quadratic += step[i] * hessianElement * step[j];
+        quadratic += step[i]! * hessianElement * step[j]!;
       }
     }
     reduction -= 0.5 * quadratic;
@@ -968,21 +968,21 @@ export class BOBYQAOptimizer {
     if (i <= j) {
       const index = (j * (j + 1)) / 2 + i;
       if (index < this.modelSecondDerivativesValues.length) {
-        element = this.modelSecondDerivativesValues[index];
+        element = this.modelSecondDerivativesValues[index]!;
       }
     } else {
       const index = (i * (i + 1)) / 2 + j;
       if (index < this.modelSecondDerivativesValues.length) {
-        element = this.modelSecondDerivativesValues[index];
+        element = this.modelSecondDerivativesValues[index]!;
       }
     }
 
     // Implicit part via interpolation points
     for (let k = 0; k < this.npt; k++) {
       element +=
-        this.modelSecondDerivativesParameters[k] *
-        this.interpolationPoints[k][i] *
-        this.interpolationPoints[k][j];
+        this.modelSecondDerivativesParameters[k]! *
+        this.interpolationPoints[k]![i]! *
+        this.interpolationPoints[k]![j]!;
     }
 
     return element;
@@ -1001,8 +1001,8 @@ export class BOBYQAOptimizer {
 
     // Update interpolation point
     for (let i = 0; i < this.n; i++) {
-      this.interpolationPoints[replaceIndex][i] =
-        newPoint[i] - this.originShift[i];
+      this.interpolationPoints[replaceIndex]![i] =
+        newPoint[i]! - this.originShift[i]!;
     }
     this.functionValues[replaceIndex] = newValue;
 
@@ -1010,7 +1010,7 @@ export class BOBYQAOptimizer {
     const bestIndex = this.getKnownBestIndex();
     for (let i = 0; i < this.n; i++) {
       this.trustRegionCenterOffset[i] =
-        this.interpolationPoints[bestIndex][i];
+        this.interpolationPoints[bestIndex]![i]!;
     }
 
     // Rebuild model matrices (simplified approach)
@@ -1031,8 +1031,8 @@ export class BOBYQAOptimizer {
 
     // Update interpolation point
     for (let i = 0; i < this.n; i++) {
-      this.interpolationPoints[replaceIndex][i] =
-        newPoint[i] - this.originShift[i];
+      this.interpolationPoints[replaceIndex]![i] =
+        newPoint[i]! - this.originShift[i]!;
     }
     this.functionValues[replaceIndex] = newValue;
 
@@ -1057,7 +1057,7 @@ export class BOBYQAOptimizer {
       let dist = 0;
       for (let i = 0; i < this.n; i++) {
         const diff =
-          this.interpolationPoints[k][i] - this.trustRegionCenterOffset[i];
+          this.interpolationPoints[k]![i]! - this.trustRegionCenterOffset[i]!;
         dist += diff * diff;
       }
 
@@ -1075,11 +1075,11 @@ export class BOBYQAOptimizer {
    */
   private getKnownBestIndex(): number {
     let bestIndex = 0;
-    let bestValue = this.functionValues[0];
+    let bestValue = this.functionValues[0]!;
 
     for (let k = 1; k < this.npt; k++) {
-      if (this.functionValues[k] < bestValue) {
-        bestValue = this.functionValues[k];
+      if (this.functionValues[k]! < bestValue) {
+        bestValue = this.functionValues[k]!;
         bestIndex = k;
       }
     }
@@ -1094,9 +1094,9 @@ export class BOBYQAOptimizer {
     let maxRadius = Number.MAX_VALUE;
 
     for (let i = 0; i < this.n; i++) {
-      const center = this.originShift[i] + this.trustRegionCenterOffset[i];
-      const distLower = center - this.lowerBounds[i];
-      const distUpper = this.upperBounds[i] - center;
+      const center = this.originShift[i]! + this.trustRegionCenterOffset[i]!;
+      const distLower = center - this.lowerBounds[i]!;
+      const distUpper = this.upperBounds[i]! - center;
       const minDist = Math.min(distLower, distUpper);
       if (minDist < maxRadius) {
         maxRadius = minDist;
@@ -1112,7 +1112,7 @@ export class BOBYQAOptimizer {
   private vectorNorm(v: number[]): number {
     let sum = 0;
     for (let i = 0; i < v.length; i++) {
-      sum += v[i] * v[i];
+      sum += v[i]! * v[i]!;
     }
     return Math.sqrt(sum);
   }

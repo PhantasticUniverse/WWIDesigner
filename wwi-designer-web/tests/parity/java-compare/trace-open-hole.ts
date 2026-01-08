@@ -16,9 +16,9 @@ async function main() {
   console.log("=== Open Hole Calculation Trace (Hole 6) ===\n");
 
   // Convert to metres
-  const holeDiameter = hole.diameter * INCH_TO_METRE;
-  const holeHeight = hole.height * INCH_TO_METRE;
-  const boreDiameter = instrument.borePoint[0].boreDiameter * INCH_TO_METRE;
+  const holeDiameter = hole!.diameter * INCH_TO_METRE;
+  const holeHeight = hole!.height * INCH_TO_METRE;
+  const boreDiameter = instrument.borePoint[0]!.boreDiameter * INCH_TO_METRE;
 
   console.log("=== Hole Parameters (in metres) ===");
   console.log(`Hole diameter: ${holeDiameter} m`);

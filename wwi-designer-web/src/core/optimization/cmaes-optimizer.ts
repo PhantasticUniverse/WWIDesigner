@@ -226,7 +226,7 @@ export class CMAESOptimizer {
       for (let i = 0; i < n; i++) {
         xmean[i] = 0;
         for (let m = 0; m < mu; m++) {
-          xmean[i] += weights[m]! * arx[arindex[m]!]![i]!;
+          xmean[i] = xmean[i]! + weights[m]! * arx[arindex[m]!]![i]!;
         }
       }
 

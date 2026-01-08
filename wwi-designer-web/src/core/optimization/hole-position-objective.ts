@@ -217,7 +217,7 @@ export class HolePositionObjectiveFunction extends BaseObjectiveFunction {
   /**
    * Get the position of the farthest bore point (end of bore).
    */
-  private getEndOfBore(): number {
+  protected getEndOfBore(): number {
     const borePoints = this.calculator.getInstrument().borePoint;
     let endPosition = borePoints[0]?.borePosition ?? 0;
 
@@ -389,11 +389,11 @@ export class HolePositionObjectiveFunction extends BaseObjectiveFunction {
     return this.lengthAdjustmentMode;
   }
 
-  getObjectiveFunctionName(): string {
+  override getObjectiveFunctionName(): string {
     return "HolePositionObjectiveFunction";
   }
 
-  getDisplayName(): string {
+  override getDisplayName(): string {
     return "Hole position optimizer";
   }
 }
@@ -483,11 +483,11 @@ export class HoleSizeObjectiveFunction extends BaseObjectiveFunction {
     this.constraints.setUpperBounds(this.upperBounds);
   }
 
-  getObjectiveFunctionName(): string {
+  override getObjectiveFunctionName(): string {
     return "HoleSizeObjectiveFunction";
   }
 
-  getDisplayName(): string {
+  override getDisplayName(): string {
     return "Hole size optimizer";
   }
 }
@@ -654,11 +654,11 @@ export class HoleObjectiveFunction extends BaseObjectiveFunction {
     this.constraints.setUpperBounds(this.upperBounds);
   }
 
-  getObjectiveFunctionName(): string {
+  override getObjectiveFunctionName(): string {
     return "HoleObjectiveFunction";
   }
 
-  getDisplayName(): string {
+  override getDisplayName(): string {
     return "Hole position & size optimizer";
   }
 }
@@ -722,7 +722,7 @@ export abstract class MergedObjectiveFunction extends BaseObjectiveFunction {
     }
   }
 
-  setLowerBounds(bounds: number[]): void {
+  override setLowerBounds(bounds: number[]): void {
     super.setLowerBounds(bounds);
     // Copy bounds to component ObjectiveFunctions
     let i = 0;
@@ -733,7 +733,7 @@ export abstract class MergedObjectiveFunction extends BaseObjectiveFunction {
     }
   }
 
-  setUpperBounds(bounds: number[]): void {
+  override setUpperBounds(bounds: number[]): void {
     super.setUpperBounds(bounds);
     // Copy bounds to component ObjectiveFunctions
     let i = 0;
@@ -1328,7 +1328,7 @@ export class HolePositionFromTopObjectiveFunction extends HolePositionObjectiveF
   /**
    * Get the position of the farthest bore point (end of bore).
    */
-  private getEndOfBore(): number {
+  protected override getEndOfBore(): number {
     const borePoints = this.calculator.getInstrument().borePoint;
     let endPosition = borePoints[0]?.borePosition ?? 0;
 
@@ -2267,7 +2267,7 @@ export class WindowHeightObjectiveFunction extends BaseObjectiveFunction {
  * Ported from HoleAndTaperObjectiveFunction.java
  */
 export class HoleAndTaperObjectiveFunction extends MergedObjectiveFunction {
-  static readonly DISPLAY_NAME = "Hole and taper optimizer";
+  static readonly DISPLAY_NAME: string = "Hole and taper optimizer";
 
   constructor(
     calculator: IInstrumentCalculator,
@@ -2777,7 +2777,7 @@ export class HoleGroupFromTopObjectiveFunction extends MergedObjectiveFunction {
  * Ported from HoleAndBoreDiameterFromTopObjectiveFunction.java
  */
 export class HoleAndBoreDiameterFromTopObjectiveFunction extends MergedObjectiveFunction {
-  static readonly DISPLAY_NAME =
+  static readonly DISPLAY_NAME: string =
     "Hole, plus bore-point diameter from top, optimizer";
 
   constructor(
@@ -2873,7 +2873,7 @@ export class HoleGroupObjectiveFunction extends MergedObjectiveFunction {
  * Ported from HoleAndBoreDiameterFromBottomObjectiveFunction.java
  */
 export class HoleAndBoreDiameterFromBottomObjectiveFunction extends MergedObjectiveFunction {
-  static readonly DISPLAY_NAME =
+  static readonly DISPLAY_NAME: string =
     "Hole, plus bore diameter from bottom, optimizer";
 
   constructor(
@@ -3319,7 +3319,7 @@ const MINIMUM_CONE_LENGTH = 0.0001;
  */
 export class SingleTaperSimpleRatioObjectiveFunction extends BaseObjectiveFunction {
   static readonly CONSTRAINT_CATEGORY = "Single bore taper";
-  static readonly DISPLAY_NAME = "Single taper (simple ratios) optimizer";
+  static readonly DISPLAY_NAME: string = "Single taper (simple ratios) optimizer";
 
   constructor(
     calculator: IInstrumentCalculator,
@@ -3515,7 +3515,7 @@ export class SingleTaperSimpleRatioObjectiveFunction extends BaseObjectiveFuncti
  * Ported from GlobalHolePositionObjectiveFunction.java
  */
 export class GlobalHolePositionObjectiveFunction extends HolePositionObjectiveFunction {
-  static override readonly DISPLAY_NAME = "Hole position global optimizer";
+  static readonly DISPLAY_NAME = "Hole position global optimizer";
 
   constructor(
     calculator: IInstrumentCalculator,
@@ -3539,7 +3539,7 @@ export class GlobalHolePositionObjectiveFunction extends HolePositionObjectiveFu
  * Ported from GlobalHoleObjectiveFunction.java
  */
 export class GlobalHoleObjectiveFunction extends HoleObjectiveFunction {
-  static override readonly DISPLAY_NAME =
+  static readonly DISPLAY_NAME =
     "Hole position and diameter global optimizer";
 
   constructor(
@@ -4451,7 +4451,7 @@ export class BoreSpacingFromTopObjectiveFunction extends BaseObjectiveFunction {
  * Ported from BoreFromBottomObjectiveFunction.java
  */
 export class BoreFromBottomObjectiveFunction extends MergedObjectiveFunction {
-  static readonly DISPLAY_NAME =
+  static readonly DISPLAY_NAME: string =
     "Bore point position and diameter, from bottom, optimizer";
 
   constructor(
@@ -4515,7 +4515,7 @@ export class BoreFromBottomObjectiveFunction extends MergedObjectiveFunction {
  * Ported from HoleAndBoreFromBottomObjectiveFunction.java
  */
 export class HoleAndBoreFromBottomObjectiveFunction extends MergedObjectiveFunction {
-  static readonly DISPLAY_NAME = "Hole and bore (from bottom) optimizer";
+  static readonly DISPLAY_NAME: string = "Hole and bore (from bottom) optimizer";
 
   constructor(
     calculator: IInstrumentCalculator,

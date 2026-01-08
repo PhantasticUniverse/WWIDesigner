@@ -3,7 +3,7 @@
  * Maps sidebar selections to actual objective function instances.
  */
 
-import type { InstrumentCalculator } from "../modelling/instrument-calculator.ts";
+import type { IInstrumentCalculator } from "../modelling/instrument-calculator.ts";
 import type { Tuning } from "../../models/tuning.ts";
 import type { IEvaluator } from "./evaluator.ts";
 import { BaseObjectiveFunction } from "./base-objective-function.ts";
@@ -365,7 +365,7 @@ function getDefaultHoleGroups(tuning: Tuning): number[][] {
  */
 export function createObjectiveFunction(
   name: string,
-  calculator: InstrumentCalculator,
+  calculator: IInstrumentCalculator,
   tuning: Tuning,
   evaluator: IEvaluator,
   holeGroups?: number[][]
@@ -525,10 +525,11 @@ export function getObjectiveFunctionsByCategory(): Record<
   > = {};
 
   for (const [name, info] of Object.entries(OBJECTIVE_FUNCTION_INFO)) {
-    if (!byCategory[info.category]) {
-      byCategory[info.category] = [];
+    const category = info.category;
+    if (!byCategory[category]) {
+      byCategory[category] = [];
     }
-    byCategory[info.category].push({
+    byCategory[category]!.push({
       name,
       displayName: info.displayName,
       description: info.description,

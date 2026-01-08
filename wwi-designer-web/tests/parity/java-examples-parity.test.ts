@@ -14,7 +14,7 @@ import { describe, test, expect, beforeAll } from "bun:test";
 import { parseInstrumentXml, parseTuningXml } from "../../src/utils/xml-converter.ts";
 import { PhysicalParameters } from "../../src/core/physics/physical-parameters.ts";
 import { DefaultInstrumentCalculator } from "../../src/core/modelling/instrument-calculator.ts";
-import { SimpleInstrumentTuner, calculateDeviationCents } from "../../src/core/modelling/instrument-tuner.ts";
+import { SimpleInstrumentTuner } from "../../src/core/modelling/instrument-tuner.ts";
 import { PlayingRange } from "../../src/core/modelling/playing-range.ts";
 import { cents } from "../../src/core/constants.ts";
 import { DefaultHoleCalculator } from "../../src/core/geometry/hole-calculator.ts";

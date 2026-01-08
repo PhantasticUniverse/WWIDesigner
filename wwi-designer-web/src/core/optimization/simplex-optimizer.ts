@@ -138,7 +138,7 @@ export class SimplexOptimizer {
     // Generate remaining points by stepping in each direction
     for (let i = 0; i < n; i++) {
       const newPoint = [...startPoint];
-      newPoint[i] += stepSizes[i]!;
+      newPoint[i] = newPoint[i]! + stepSizes[i]!;
       // Clip to bounds
       newPoint[i] = Math.max(lowerBounds[i]!, Math.min(upperBounds[i]!, newPoint[i]!));
       simplex[i + 1] = {

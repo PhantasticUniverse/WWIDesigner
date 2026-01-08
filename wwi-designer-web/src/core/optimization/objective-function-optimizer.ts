@@ -576,8 +576,8 @@ function multiStartOptimize(
     };
   }
 
-  // Get best result
-  let bestResult = validResults[0];
+  // Get best result (guaranteed to exist since we checked length > 0 above)
+  let bestResult = validResults[0]!;
 
   // Final refinement with original evaluator if two-stage is enabled
   if (runTwoStage) {

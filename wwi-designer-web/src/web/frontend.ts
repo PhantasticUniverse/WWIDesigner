@@ -422,8 +422,8 @@ function renderMouthpieceEditor(instrument: Instrument, tabId: string): string {
           <input type="number" step="0.1" id="airstream-length-${tabId}" value="${mp.embouchureHole?.airstreamLength || ""}" />
         </div>
         <div class="form-group">
-          <label>Flue Depth</label>
-          <input type="number" step="0.001" id="emb-windway-height-${tabId}" value="${mp.embouchureHole?.windwayHeight || ""}" />
+          <label>Airstream Height</label>
+          <input type="number" step="0.001" id="emb-airstream-height-${tabId}" value="${mp.embouchureHole?.airstreamHeight || ""}" />
         </div>
       </div>
     </div>
@@ -586,12 +586,12 @@ function updateInstrumentFromEditor(tabId: string, instrumentId: string) {
     const fippleFactorVal = $<HTMLInputElement>(`#fipple-factor-${tabId}`)?.value;
 
     // Preserve existing values for fields not shown in UI
-    const existingFipple = inst.mouthpiece.fipple || {};
+    const existingFipple = inst.mouthpiece.fipple;
     inst.mouthpiece.fipple = {
-      windowLength: windowLengthVal ? parseFloat(windowLengthVal) : undefined,
-      windowWidth: windowWidthVal ? parseFloat(windowWidthVal) : undefined,
-      windowHeight: existingFipple.windowHeight,
-      windwayLength: existingFipple.windwayLength,
+      windowLength: windowLengthVal ? parseFloat(windowLengthVal) : existingFipple?.windowLength ?? 0,
+      windowWidth: windowWidthVal ? parseFloat(windowWidthVal) : existingFipple?.windowWidth ?? 0,
+      windowHeight: existingFipple?.windowHeight,
+      windwayLength: existingFipple?.windwayLength,
       windwayHeight: windwayHeightVal ? parseFloat(windwayHeightVal) : undefined,
       fippleFactor: fippleFactorVal ? parseFloat(fippleFactorVal) : undefined,
     };
@@ -602,14 +602,15 @@ function updateInstrumentFromEditor(tabId: string, instrumentId: string) {
     const widthVal = $<HTMLInputElement>(`#emb-width-${tabId}`)?.value;
     const heightVal = $<HTMLInputElement>(`#emb-height-${tabId}`)?.value;
     const airstreamLengthVal = $<HTMLInputElement>(`#airstream-length-${tabId}`)?.value;
-    const embWindwayHeightVal = $<HTMLInputElement>(`#emb-windway-height-${tabId}`)?.value;
+    const airstreamHeightVal = $<HTMLInputElement>(`#emb-airstream-height-${tabId}`)?.value;
 
+    const existingEmb = inst.mouthpiece.embouchureHole;
     inst.mouthpiece.embouchureHole = {
-      length: lengthVal ? parseFloat(lengthVal) : undefined,
-      width: widthVal ? parseFloat(widthVal) : undefined,
-      height: heightVal ? parseFloat(heightVal) : undefined,
-      airstreamLength: airstreamLengthVal ? parseFloat(airstreamLengthVal) : undefined,
-      windwayHeight: embWindwayHeightVal ? parseFloat(embWindwayHeightVal) : undefined,
+      length: lengthVal ? parseFloat(lengthVal) : existingEmb?.length ?? 0,
+      width: widthVal ? parseFloat(widthVal) : existingEmb?.width ?? 0,
+      height: heightVal ? parseFloat(heightVal) : existingEmb?.height ?? 0,
+      airstreamLength: airstreamLengthVal ? parseFloat(airstreamLengthVal) : existingEmb?.airstreamLength ?? 0,
+      airstreamHeight: airstreamHeightVal ? parseFloat(airstreamHeightVal) : existingEmb?.airstreamHeight ?? 0,
     };
 
     delete inst.mouthpiece.fipple;
@@ -970,18 +971,18 @@ function drawInstrument(instrument: Instrument, canvasId: string) {
   ctx.lineWidth = 2;
 
   // Top profile
-  ctx.moveTo(posToX(borePoints[0].borePosition), centerY - diaToY(borePoints[0].boreDiameter));
+  ctx.moveTo(posToX(borePoints[0]!.borePosition), centerY - diaToY(borePoints[0]!.boreDiameter));
   for (const bp of borePoints) {
     ctx.lineTo(posToX(bp.borePosition), centerY - diaToY(bp.boreDiameter));
   }
 
   // Connect to bottom
-  const lastBp = borePoints[borePoints.length - 1];
+  const lastBp = borePoints[borePoints.length - 1]!;
   ctx.lineTo(posToX(lastBp.borePosition), centerY + diaToY(lastBp.boreDiameter));
 
   // Bottom profile (reverse)
   for (let i = borePoints.length - 1; i >= 0; i--) {
-    const bp = borePoints[i];
+    const bp = borePoints[i]!;
     ctx.lineTo(posToX(bp.borePosition), centerY + diaToY(bp.boreDiameter));
   }
 
@@ -1109,16 +1110,16 @@ function drawMouthpiece(
 
 function getBoreDiameterAtPosition(borePoints: BorePoint[], position: number): number {
   if (borePoints.length === 0) return 16;
-  if (borePoints.length === 1) return borePoints[0].boreDiameter;
+  if (borePoints.length === 1) return borePoints[0]!.boreDiameter;
 
   // Find surrounding bore points
-  let left = borePoints[0];
-  let right = borePoints[borePoints.length - 1];
+  let left = borePoints[0]!;
+  let right = borePoints[borePoints.length - 1]!;
 
   for (let i = 0; i < borePoints.length - 1; i++) {
-    if (borePoints[i].borePosition <= position && borePoints[i + 1].borePosition >= position) {
-      left = borePoints[i];
-      right = borePoints[i + 1];
+    if (borePoints[i]!.borePosition <= position && borePoints[i + 1]!.borePosition >= position) {
+      left = borePoints[i]!;
+      right = borePoints[i + 1]!;
       break;
     }
   }
@@ -1461,7 +1462,7 @@ function showInstrumentComparison() {
 
   // Initial comparison
   if (instruments.length >= 2) {
-    renderComparisonTable(instruments[0][0], instruments[1][0]);
+    renderComparisonTable(instruments[0]![0], instruments[1]![0]);
   }
 }
 

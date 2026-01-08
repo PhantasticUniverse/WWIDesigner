@@ -47,6 +47,7 @@ describe("Calculator Factory", () => {
       // Create a generic fipple instrument
       const instrument = {
         name: "Generic Fipple Instrument",
+        lengthType: "MM" as const,
         mouthpiece: {
           position: 0,
           fipple: {
@@ -56,7 +57,7 @@ describe("Calculator Factory", () => {
         },
         borePoint: [{ borePosition: 0, boreDiameter: 10 }],
         hole: [],
-        termination: {},
+        termination: { flangeDiameter: 0 },
       };
       expect(detectCalculatorType(instrument)).toBe("naf");
     });

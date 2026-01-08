@@ -26,6 +26,18 @@ import {
 // Simple XML Parser (using regex for basic structure)
 // ============================================================================
 
+/**
+ * Security limits for XML parsing to prevent DoS attacks.
+ */
+const XML_PARSER_LIMITS = {
+  /** Maximum XML input size in bytes (1MB) */
+  MAX_SIZE: 1024 * 1024,
+  /** Maximum nesting depth */
+  MAX_DEPTH: 50,
+  /** Maximum number of elements */
+  MAX_ELEMENTS: 10000,
+};
+
 interface XmlNode {
   tag: string;
   attributes: Record<string, string>;
@@ -36,8 +48,18 @@ interface XmlNode {
 /**
  * Very simple XML parser for the WWIDesigner XML format.
  * Not a full XML parser - just enough for our specific format.
+ *
+ * Security features:
+ * - Maximum size limit
+ * - Maximum nesting depth
+ * - Maximum element count
  */
 function parseXml(xml: string): XmlNode | null {
+  // Security: Check size limit
+  if (xml.length > XML_PARSER_LIMITS.MAX_SIZE) {
+    throw new Error(`XML too large: ${xml.length} bytes exceeds limit of ${XML_PARSER_LIMITS.MAX_SIZE} bytes`);
+  }
+
   // Remove XML declaration and namespace-related attributes
   xml = xml.replace(/<\?xml[^>]*\?>/g, "");
   xml = xml.replace(/xmlns:[^=]+="[^"]*"/g, "");
@@ -49,6 +71,7 @@ function parseXml(xml: string): XmlNode | null {
   const stack: XmlNode[] = [];
   let current: XmlNode | null = null;
   let root: XmlNode | null = null;
+  let elementCount = 0;
 
   // Match tags and text
   const regex = /<([\/\w]+)([^>]*)>|([^<]+)/g;
@@ -66,6 +89,17 @@ function parseXml(xml: string): XmlNode | null {
           current = stack.pop() || null;
         }
       } else {
+        // Security: Check element count
+        elementCount++;
+        if (elementCount > XML_PARSER_LIMITS.MAX_ELEMENTS) {
+          throw new Error(`XML has too many elements: exceeds limit of ${XML_PARSER_LIMITS.MAX_ELEMENTS}`);
+        }
+
+        // Security: Check nesting depth
+        if (stack.length >= XML_PARSER_LIMITS.MAX_DEPTH) {
+          throw new Error(`XML nesting too deep: exceeds limit of ${XML_PARSER_LIMITS.MAX_DEPTH}`);
+        }
+
         // Opening tag
         const newNode: XmlNode = {
           tag: tagPart,

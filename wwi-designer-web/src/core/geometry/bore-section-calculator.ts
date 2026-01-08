@@ -105,6 +105,7 @@ export function createBoreSectionsFromPoints(
       length: right.borePosition - left.borePosition,
       leftRadius: left.boreDiameter / 2,
       rightRadius: right.boreDiameter / 2,
+      rightBorePosition: right.borePosition,
     });
   }
 

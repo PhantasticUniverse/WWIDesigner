@@ -68,7 +68,7 @@ const SAMPLE_TUNING = {
 };
 
 // Server instance for testing
-let server: Server | null = null;
+let server: Server<unknown> | null = null;
 let baseUrl: string;
 
 beforeAll(async () => {
@@ -112,6 +112,9 @@ beforeAll(async () => {
 
       try {
         const predicted = tuner.predictedFrequency(fingering);
+        if (predicted === null) {
+          return { note: note.name || "Unknown", targetFrequency: targetFreq, error: "Could not predict frequency" };
+        }
         const deviation = 1200 * Math.log2(predicted / targetFreq);
         return {
           note: note.name || "Unknown",
@@ -159,8 +162,7 @@ beforeAll(async () => {
     const startTime = performance.now();
 
     const result = optimizeObjectiveFunction(objective, {
-      maxIterations: 100, // Reduced for tests
-      tolerance: 1e-4,
+      maxEvaluations: 100, // Reduced for tests
     });
 
     const elapsedTime = (performance.now() - startTime) / 1000;
@@ -211,7 +213,7 @@ beforeAll(async () => {
     const evaluator = new CentDeviationEvaluator(calc);
     const objective = createObjectiveFunction(objectiveFunction, calc, tuning, evaluator);
 
-    let constraintIntent: ConstraintIntent;
+    let constraintIntent: number;
     switch (intent.toLowerCase()) {
       case "blank":
         constraintIntent = ConstraintIntent.BLANK;

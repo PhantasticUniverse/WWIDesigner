@@ -53,6 +53,18 @@ export interface IInstrumentTuner {
    * @returns Predicted tuning
    */
   getPredictedTuning(): Tuning;
+
+  /**
+   * Set the instrument to tune.
+   * @param instrument - Instrument to tune
+   */
+  setInstrument(instrument: Instrument): void;
+
+  /**
+   * Set the target tuning.
+   * @param tuning - Target tuning
+   */
+  setTuning(tuning: Tuning): void;
 }
 
 /**
@@ -550,7 +562,7 @@ export class LinearVInstrumentTuner extends InstrumentTuner {
   /**
    * Predict the played note with fmin, fmax, and nominal frequency.
    */
-  predictedNote(fingering: Fingering): Note {
+  override predictedNote(fingering: Fingering): Note {
     const targetNote = fingering.note;
     const predNote: Note = {
       name: targetNote?.name,
@@ -769,7 +781,7 @@ export class LinearXInstrumentTuner extends InstrumentTuner {
   /**
    * Predict the played note with fmin, fmax, and nominal frequency.
    */
-  predictedNote(fingering: Fingering): Note {
+  override predictedNote(fingering: Fingering): Note {
     const targetNote = fingering.note;
     const predNote: Note = {
       name: targetNote?.name,

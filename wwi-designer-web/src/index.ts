@@ -19,8 +19,26 @@
 // Core exports
 export * from "./core/index.ts";
 
-// Model exports
-export * from "./models/index.ts";
+// Model exports (explicit to avoid naming conflicts with core/optimization/constraints)
+export {
+  type Instrument,
+  type BorePoint,
+  type Hole,
+  type Mouthpiece,
+  type Termination,
+  validateInstrument,
+  createInstrument,
+  convertInstrumentToMetres,
+  convertInstrumentFromMetres,
+} from "./models/instrument.ts";
+
+export {
+  type Tuning,
+  type Fingering,
+  type Note,
+  validateTuning,
+  createTuning,
+} from "./models/tuning.ts";
 
 // Utility exports
 export * from "./utils/index.ts";

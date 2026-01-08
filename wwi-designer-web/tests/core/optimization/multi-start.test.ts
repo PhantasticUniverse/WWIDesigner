@@ -59,12 +59,12 @@ class TestObjectiveFunction extends BaseObjectiveFunction {
     this.maxEvaluations = 500;
   }
 
-  value(point: number[]): number {
+  override value(point: number[]): number {
     this.evaluationsDone++;
     return this.testFunction(point);
   }
 
-  getErrorVector(point: number[]): number[] {
+  override getErrorVector(point: number[]): number[] {
     return [Math.sqrt(this.testFunction(point))];
   }
 
@@ -90,8 +90,8 @@ describe("RandomRangeProcessor", () => {
       expect(vector.length).toBe(3);
 
       for (let j = 0; j < 3; j++) {
-        expect(vector[j]).toBeGreaterThanOrEqual(lowerBounds[j]);
-        expect(vector[j]).toBeLessThanOrEqual(upperBounds[j]);
+        expect(vector[j]!).toBeGreaterThanOrEqual(lowerBounds[j]!);
+        expect(vector[j]!).toBeLessThanOrEqual(upperBounds[j]!);
       }
     }
   });
@@ -201,10 +201,10 @@ describe("LatinHypercubeRangeProcessor", () => {
     // For each dimension, samples should be spread across n strata
     // Check that samples are reasonably distributed
     for (let dim = 0; dim < 2; dim++) {
-      const values = vectors.map((v) => v[dim]).sort((a, b) => a - b);
+      const values = vectors.map((v) => v[dim]!).sort((a, b) => a - b);
 
       // Check that values span most of the range
-      expect(values[n - 1] - values[0]).toBeGreaterThan(0.5);
+      expect(values[n - 1]! - values[0]!).toBeGreaterThan(0.5);
     }
   });
 });
@@ -230,7 +230,7 @@ describe("Multi-start optimization", () => {
   it("should run with numberOfStarts option", () => {
     // Quadratic function with minimum at (2, 3)
     const objective = new TestObjectiveFunction(
-      (point) => (point[0] - 2) ** 2 + (point[1] - 3) ** 2,
+      (point) => (point[0]! - 2) ** 2 + (point[1]! - 3) ** 2,
       [0, 0],
       [5, 5],
       [0, 0]
@@ -247,7 +247,7 @@ describe("Multi-start optimization", () => {
 
   it("should use rangeProcessor from objective function", () => {
     const objective = new TestObjectiveFunction(
-      (point) => point[0] ** 2 + point[1] ** 2,
+      (point) => point[0]! ** 2 + point[1]! ** 2,
       [-5, -5],
       [5, 5],
       [3, 3]
@@ -275,8 +275,8 @@ describe("Multi-start optimization", () => {
     // Has local minima at different locations
     // Offset by 2 to ensure all values are positive
     const multimodalFn = (point: number[]) => {
-      const x = point[0];
-      const y = point[1];
+      const x = point[0]!;
+      const y = point[1]!;
       return Math.sin(x) + Math.sin(y) + 2 + 0.1 * (x * x + y * y);
     };
 
@@ -319,7 +319,7 @@ describe("Multi-start optimization", () => {
 
   it("should report progress during multi-start", () => {
     const objective = new TestObjectiveFunction(
-      (point) => point[0] ** 2,
+      (point) => point[0]! ** 2,
       [-5],
       [5],
       [3]
@@ -343,7 +343,7 @@ describe("Multi-start optimization", () => {
 describe("Multi-start with 'vary bore length' pattern", () => {
   it("should vary only first dimension when indicesToVary is [0]", () => {
     const objective = new TestObjectiveFunction(
-      (point) => point[0] ** 2 + point[1] ** 2 + point[2] ** 2,
+      (point) => point[0]! ** 2 + point[1]! ** 2 + point[2]! ** 2,
       [0, 0, 0],
       [10, 10, 10],
       [5, 5, 5]

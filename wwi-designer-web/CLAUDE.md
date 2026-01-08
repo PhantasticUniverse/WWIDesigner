@@ -27,7 +27,7 @@
 | Evaluators | **7/8** | Missing only WhistleEvaluator |
 | Tuners | **5/5** | Simple, LinearV, LinearX, BellNotes, base |
 | Spectrum Analyzers | **3/3** | Impedance, Reflectance, PlayingRange |
-| Tests | **803** | All passing |
+| Tests | **810** | All passing |
 
 ### Not Implemented (Low Priority)
 
@@ -36,27 +36,36 @@
 
 ### Known Issues
 
-| Issue | Impact | Potential Fix |
-|-------|--------|---------------|
-| **Immutable Complex class creates excessive objects** | Slower than Java (~4-5x for heavy optimization) | Add mutable in-place operations (`addInPlace`, `multiplyInPlace`) or use flat array representation `[re, im]` instead of objects |
-| **TransferMatrix allocates 16+ Complex objects per multiply** | Memory pressure during optimization | Inline complex arithmetic or use object pooling |
+| Issue | Impact | Status |
+|-------|--------|--------|
+| **CMA-ES missing eigendecomposition** | Loses covariance adaptation | Open |
 
-**Details on Complex class performance:**
+**CMA-ES eigendecomposition (not yet implemented):**
 
-The `Complex` class in `src/core/math/complex.ts` is immutable - every operation creates a new object:
+The CMA-ES optimizer (`src/core/optimization/cmaes-optimizer.ts` lines 279-284) uses a simplified approach:
+- B matrix stays identity (never updated)
+- Eigenvalues extracted from diagonal only
+
+This breaks covariance adaptation, the main advantage of CMA-ES over simpler methods. Java uses Apache Commons Math which handles eigendecomposition internally. Fix requires implementing Jacobi algorithm for symmetric matrices.
+
+### Resolved Issues
+
+| Issue | Resolution |
+|-------|------------|
+| **Complex class object allocation** | ✅ In-place operations added (`multiplyInPlace`, `addInPlace`, etc.) |
+| **TransferMatrix memory pressure** | ✅ Scratch objects with in-place operations implemented |
+| **TypeScript strict mode errors** | ✅ All 782 errors fixed, zero errors remaining |
+
+**Complex class performance (resolved):**
+
+The `Complex` class now has mutable in-place operations for hot paths:
 ```typescript
-// Current: creates 4 intermediate Complex objects
+// Immutable (creates intermediate objects):
 result = a.multiply(b).add(c.multiply(d));
 
-// Each TransferMatrix.multiply() does this 8 times = 16+ objects per call
+// Mutable (reuses objects, faster):
+result = a.copy().multiplyInPlace(b).addInPlace(c.copy().multiplyInPlace(d));
 ```
-
-During optimization, millions of transfer matrix calculations occur. Java's mutable approach reuses objects, while our immutable approach triggers garbage collection overhead.
-
-**Potential solutions (not yet implemented):**
-1. Add mutable operations: `a.multiplyInPlace(b).addInPlace(c.multiplyInPlace(d))`
-2. Use flat arrays: `[re, im]` instead of `new Complex(re, im)`
-3. Object pooling: Reuse Complex objects from a fixed pool
 
 ### Real-World Testing Status
 
@@ -158,7 +167,7 @@ Organized by category:
 ## Testing
 
 ```bash
-bun test                           # Run all 803 tests
+bun test                           # Run all 810 tests
 bun test --watch                   # Watch mode
 bun test tests/parity/             # Java comparison tests only
 bun test tests/core/optimization/  # Optimization tests only
@@ -198,7 +207,10 @@ NAF D Minor Cherry tuning (14 notes):
 | `/api/optimize` | POST | Optimize instrument geometry |
 | `/api/sketch` | POST | Get visualization data |
 | `/api/constraints/get` | POST | Get constraints for objective function |
+| `/api/constraints/parse` | POST | Parse constraints from XML/JSON |
+| `/api/constraints/export` | POST | Export constraints to XML/JSON |
 | `/api/constraints/objective-functions` | GET | List all 51 objective functions |
+| `/api/session` | POST/GET | Session management |
 
 ### Example: Optimize Instrument
 
@@ -227,6 +239,36 @@ Response:
   "elapsedTime": 3.2
 }
 ```
+
+### Security Features
+
+The server includes security hardening for public deployment:
+
+| Feature | Configuration | Default |
+|---------|--------------|---------|
+| Request size limit | `MAX_REQUEST_SIZE` | 1MB |
+| Rate limit (optimize) | Per IP | 5/minute |
+| Rate limit (default) | Per IP | 60/minute |
+| Session expiry | `SESSION_EXPIRY_MS` | 1 hour |
+| Max sessions | `MAX_SESSIONS` | 10,000 |
+| Temperature bounds | `TEMPERATURE_MIN/MAX` | -50°C to 60°C |
+| Humidity bounds | `HUMIDITY_MIN/MAX` | 0% to 100% |
+| Array limits | Bore/holes/fingerings | 100/50/100 max |
+| XML parser limits | Size/depth/elements | 1MB/50/10000 |
+
+Configuration in `src/web/server.ts` under `SECURITY_CONFIG`.
+
+### Error Responses
+
+All errors return JSON with `error` message and `code`:
+
+```json
+{ "error": "Rate limited", "code": "RATE_LIMITED" }
+{ "error": "Missing instrument or tuning", "code": "MISSING_INPUT" }
+{ "error": "Invalid temperature range", "code": "INVALID_PARAMS" }
+```
+
+Error codes: `RATE_LIMITED`, `PAYLOAD_TOO_LARGE`, `MISSING_INPUT`, `INVALID_INSTRUMENT`, `INVALID_TUNING`, `INVALID_PARAMS`, `INVALID_OBJECTIVE`, `NOT_FOUND`, `INTERNAL_ERROR`
 
 ---
 
@@ -299,16 +341,53 @@ bun <file.ts>        # Execute TypeScript directly
 
 ### Bun APIs Used
 
-- `Bun.serve()` for HTTP server with routes
+- `Bun.serve()` with `routes` for HTML bundling and `fetch` for API middleware
 - `Bun.file()` for file operations
 - `bun:test` for testing framework
 - Native TypeScript execution (no transpilation step)
 
 ---
 
+## TypeScript Configuration
+
+The project uses **strict TypeScript** with additional safety checks:
+
+| Setting | Effect |
+|---------|--------|
+| `strict: true` | All strict type checks enabled |
+| `noUncheckedIndexedAccess: true` | Array access returns `T \| undefined` |
+| `noImplicitOverride: true` | Requires `override` keyword on overriding methods |
+
+### Quick Reference
+
+```bash
+bunx tsc --noEmit   # Type check (should show 0 errors)
+bun test            # Run all 810 tests
+```
+
+**Common patterns:**
+```typescript
+array[i]!                                    // Non-null assertion for bounds-safe access
+override methodName() { ... }                // Override base class methods
+mockObj as unknown as IInterface             // Double assertion for partial mocks
+```
+
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed TypeScript patterns and examples.
+
+---
+
 ## Documentation
 
-Detailed theory documentation in `docs/`:
+Detailed documentation in `docs/`:
+
+### Developer Guides
+
+| Document | Content |
+|----------|---------|
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Development practices, TypeScript patterns, testing, contributing |
+| [JAVA_PARITY.md](docs/JAVA_PARITY.md) | Complete Java class mapping and verification |
+
+### Acoustic Theory
 
 | Document | Content |
 |----------|---------|
@@ -320,7 +399,6 @@ Detailed theory documentation in `docs/`:
 | [MOUTHPIECES.md](docs/MOUTHPIECES.md) | Fipple, embouchure, reed models |
 | [TERMINATION.md](docs/TERMINATION.md) | Radiation impedance calculations |
 | [OPTIMIZATION.md](docs/OPTIMIZATION.md) | All 6 optimization algorithms |
-| [JAVA_PARITY.md](docs/JAVA_PARITY.md) | Complete Java class mapping |
 
 ---
 

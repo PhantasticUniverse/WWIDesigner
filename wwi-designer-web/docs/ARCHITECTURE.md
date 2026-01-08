@@ -15,7 +15,8 @@ WWIDesigner Web is a TypeScript/Bun port of the Java WWIDesigner application for
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      API Layer (Bun.serve)                          │
-│  /api/calculate-tuning, /api/optimize, /api/impedance               │
+│  /api/calculate-tuning, /api/optimize, /api/constraints/*           │
+│  [Rate limiting, input validation, CORS, error sanitization]        │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
@@ -186,7 +187,7 @@ This implementation achieves **exact parity** with Java WWIDesigner:
 
 - All acoustic calculations match to 15+ significant digits
 - NAF tuning predictions: 1.41 cents average deviation (identical to Java)
-- 803 tests, including 68+ parity tests against Java output
+- 810 tests, including 68+ parity tests against Java output
 - All 51 objective functions ported (100% complete)
 - Six optimization algorithms: DIRECT, BOBYQA, Brent, CMA-ES, Simplex, Powell
 - Multi-start and two-stage optimization pipelines matching Java

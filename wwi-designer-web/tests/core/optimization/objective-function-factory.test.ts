@@ -79,9 +79,9 @@ describe("Objective Function Factory", () => {
       for (const name of names) {
         const info = OBJECTIVE_FUNCTION_INFO[name];
         expect(info).toBeDefined();
-        expect(info.displayName).toBeTruthy();
-        expect(info.category).toBeTruthy();
-        expect(info.description).toBeTruthy();
+        expect(info!.displayName).toBeTruthy();
+        expect(info!.category).toBeTruthy();
+        expect(info!.description).toBeTruthy();
       }
     });
 
@@ -112,7 +112,7 @@ describe("Objective Function Factory", () => {
 
       // Check structure of each entry
       for (const category of Object.keys(byCategory)) {
-        for (const func of byCategory[category]) {
+        for (const func of byCategory[category]!) {
           expect(func.name).toBeTruthy();
           expect(func.displayName).toBeTruthy();
           expect(func.description).toBeTruthy();
@@ -122,7 +122,7 @@ describe("Objective Function Factory", () => {
 
     test("should have mouthpiece functions", () => {
       const byCategory = getObjectiveFunctionsByCategory();
-      const mouthpieceFuncs = byCategory["Mouthpiece"];
+      const mouthpieceFuncs = byCategory["Mouthpiece"]!;
 
       expect(mouthpieceFuncs.some((f) => f.name === "FippleFactorObjectiveFunction")).toBe(true);
       expect(mouthpieceFuncs.some((f) => f.name === "WindowHeightObjectiveFunction")).toBe(true);
@@ -319,12 +319,12 @@ describe("Objective Function Factory", () => {
 
       const originalPoint = objective.getGeometryPoint();
       const modifiedPoint = [...originalPoint];
-      modifiedPoint[0] *= 1.01; // 1% change
+      modifiedPoint[0] = modifiedPoint[0]! * 1.01; // 1% change
 
       objective.setGeometryPoint(modifiedPoint);
       const newPoint = objective.getGeometryPoint();
 
-      expect(newPoint[0]).toBeCloseTo(modifiedPoint[0], 5);
+      expect(newPoint[0]).toBeCloseTo(modifiedPoint[0]!, 5);
     });
   });
 });

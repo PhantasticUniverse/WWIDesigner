@@ -170,6 +170,7 @@ describe("Java Parity - Tube Calculations", () => {
       length: BaseLength,
       leftRadius: BaseRadius,
       rightRadius: BaseRadius,
+      rightBorePosition: BaseLength,
     };
 
     const tm2 = boreCalc.calcTransferMatrix(bore, waveNumber, params);
@@ -247,6 +248,7 @@ describe("Java Parity - Tube Calculations", () => {
       length: BaseLength,
       leftRadius: BaseRadius,
       rightRadius: 0.75 * BaseRadius,
+      rightBorePosition: BaseLength,
     };
 
     const tm2 = boreCalc.calcTransferMatrix(bore, waveNumber, params);

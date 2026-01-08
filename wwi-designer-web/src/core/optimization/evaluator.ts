@@ -24,6 +24,24 @@ import { PhysicalParameters } from "../physics/physical-parameters.ts";
 import type { Instrument } from "../../models/instrument.ts";
 
 /**
+ * Enable debug logging for evaluator errors.
+ * Set to true for debugging optimization issues.
+ */
+const DEBUG_EVALUATOR = false;
+
+/**
+ * Log evaluator error in debug mode only.
+ * These errors are expected during optimization as some fingerings
+ * may not produce valid predictions. They are handled by using
+ * default error values.
+ */
+function logEvaluatorError(context: string, error: unknown): void {
+  if (DEBUG_EVALUATOR) {
+    console.debug(`[Evaluator] ${context}:`, error);
+  }
+}
+
+/**
  * Interface for evaluators that calculate error between target and predicted.
  */
 export interface IEvaluator {
@@ -122,7 +140,8 @@ export class CentDeviationEvaluator extends BaseEvaluator {
           if (predicted !== null) {
             centDeviation = calcCents(target.note.frequency, predicted);
           }
-        } catch {
+        } catch (e) {
+          logEvaluatorError("CentDeviationEvaluator.predictedFrequency", e);
           // Keep default error value
         }
       } else {
@@ -181,7 +200,8 @@ export class FrequencyDeviationEvaluator extends BaseEvaluator {
             // Large default error
             deviation = target.note.frequency;
           }
-        } catch {
+        } catch (e) {
+          logEvaluatorError("FrequencyDeviationEvaluator.predictedFrequency", e);
           deviation = target.note.frequency;
         }
       }
@@ -221,7 +241,8 @@ export class ReactanceEvaluator implements IEvaluator {
           const Z = this.calculator.calcZ(target.note.frequency, target);
           // Normalize by characteristic impedance for comparison
           reactance = Z.im;
-        } catch {
+        } catch (e) {
+          logEvaluatorError("ReactanceEvaluator.calcZ", e);
           reactance = 1e6; // Large error
         }
       }
@@ -279,7 +300,8 @@ export class FminEvaluator extends BaseEvaluator {
           if (predicted.frequencyMin !== undefined) {
             centDeviation = calcCents(actual.note.frequencyMin, predicted.frequencyMin);
           }
-        } catch {
+        } catch (e) {
+          logEvaluatorError("FminEvaluator.predictedNote", e);
           // Keep default error value
         }
       } else {
@@ -340,7 +362,8 @@ export class FmaxEvaluator extends BaseEvaluator {
           if (predicted.frequencyMax !== undefined) {
             centDeviation = calcCents(actual.note.frequencyMax, predicted.frequencyMax);
           }
-        } catch {
+        } catch (e) {
+          logEvaluatorError("FmaxEvaluator.predictedNote", e);
           // Keep default error value
         }
       } else {
@@ -437,7 +460,8 @@ export class FminmaxEvaluator extends BaseEvaluator {
             // No target available - don't include in optimization
             centDeviation = 0.0;
           }
-        } catch {
+        } catch (e) {
+          logEvaluatorError("FminmaxEvaluator.predictedNote", e);
           // Keep default error value
         }
       } else {
@@ -541,7 +565,7 @@ export class ReflectionEvaluator implements IEvaluator {
           target
         );
         // Multiply by -1, so that reflectance of -1 has phase angle of zero
-        const negRefl = reflectionCoeff.neg();
+        const negRefl = reflectionCoeff.negate();
         errorVector[i] = negRefl.arg();
       }
     }
