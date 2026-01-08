@@ -902,6 +902,67 @@ const finalPoint = bobyqaResult.value < directResult.value
 
 This pipeline matches the Java WWIDesigner behavior.
 
+## Multi-Start Optimization
+
+Multi-start optimization runs the optimizer from multiple starting points to escape local minima.
+
+### Range Processors
+
+Three strategies are available for generating starting points:
+
+| Strategy | Class | Description |
+|----------|-------|-------------|
+| `random` | `RandomRangeProcessor` | Uniformly distributed random points |
+| `grid` | `GridRangeProcessor` | Regular grid across parameter space |
+| `lhs` | `LatinHypercubeRangeProcessor` | Latin Hypercube Sampling for space-filling |
+
+### Usage
+
+```typescript
+import { optimizeObjectiveFunction } from "./optimization/index.ts";
+
+// Enable multi-start with options
+const result = optimizeObjectiveFunction(objective, {
+  numberOfStarts: 30,               // Number of starting points
+  multiStartStrategy: "random",     // Strategy: "random", "grid", or "lhs"
+  indicesToVary: [0],               // Only vary first dimension (bore length)
+  maxEvaluations: 30000,            // Total evaluations across all starts
+});
+```
+
+### "Vary Bore Length" Pattern
+
+To vary only bore length (dimension 0) like Java's multi-start:
+
+```typescript
+import { GridRangeProcessor } from "./optimization/index.ts";
+
+// Create range processor that only varies dimension 0
+const rangeProcessor = new GridRangeProcessor(
+  objective.getLowerBounds(),
+  objective.getUpperBounds(),
+  [0],  // Only vary dimension 0 (bore length)
+  30    // 30 starting points
+);
+
+// Set static values for other dimensions
+rangeProcessor.setStaticValues(objective.getInitialPoint());
+
+// Attach to objective function
+objective.setRangeProcessor(rangeProcessor);
+
+// Run optimization (will automatically use multi-start)
+const result = optimizeObjectiveFunction(objective);
+```
+
+### Best Result Selection
+
+Multi-start optimization:
+1. Runs optimization from each starting point
+2. Collects all results
+3. Sorts by objective value (best first)
+4. Returns the best result found
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System overview

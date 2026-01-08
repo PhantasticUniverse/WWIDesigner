@@ -181,7 +181,7 @@ This implementation achieves **exact parity** with Java WWIDesigner:
 
 - All acoustic calculations match to 15+ significant digits
 - NAF tuning predictions: 1.41 cents average deviation (identical to Java)
-- 670 tests, including 68+ parity tests against Java output
+- 685 tests, including 68+ parity tests against Java output
 - All 52 objective functions ported (100% complete)
 - Two-stage optimization pipeline (DIRECT → BOBYQA) matching Java
 
