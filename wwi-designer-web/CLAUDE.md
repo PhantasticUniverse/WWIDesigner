@@ -58,6 +58,21 @@ During optimization, millions of transfer matrix calculations occur. Java's muta
 2. Use flat arrays: `[re, im]` instead of `new Complex(re, im)`
 3. Object pooling: Reuse Complex objects from a fixed pool
 
+### Real-World Testing Status
+
+While unit tests verify numerical parity with Java, real-world testing with actual instruments is ongoing:
+
+| Instrument Type | Optimization Type | Status | Notes |
+|-----------------|-------------------|--------|-------|
+| **NAF** | Hole Size | ✅ Tested | Working correctly |
+| **NAF** | Hole Position | ⏳ Pending | |
+| **NAF** | Bore/Taper | ⏳ Pending | |
+| **NAF** | Combined (holes + taper) | ⏳ Pending | |
+| **Whistle** | All | ⏳ Pending | |
+| **Flute** | All | ⏳ Pending | |
+
+**Test instrument:** NAF D Minor Cherry (14 fingerings, 6 holes)
+
 ---
 
 ## Architecture
