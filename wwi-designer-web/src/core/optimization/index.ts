@@ -13,6 +13,12 @@ export {
   type DIRECTOptions,
 } from "./direct-optimizer.ts";
 
+// BOBYQA local optimizer
+export {
+  BOBYQAOptimizer,
+  type BOBYQAOptions,
+} from "./bobyqa-optimizer.ts";
+
 // Evaluators
 export {
   type IEvaluator,

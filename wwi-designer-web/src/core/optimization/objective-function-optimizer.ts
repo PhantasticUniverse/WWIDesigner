@@ -15,6 +15,7 @@
  */
 
 import { DIRECTOptimizer, type OptimizationResult } from "./direct-optimizer.ts";
+import { BOBYQAOptimizer } from "./bobyqa-optimizer.ts";
 import {
   BaseObjectiveFunction,
   OptimizerType,
@@ -90,10 +91,40 @@ function runDirect(
 }
 
 /**
- * Run a simple local optimization (gradient-free).
+ * Optimize using the BOBYQA algorithm.
  *
- * This is a simplified implementation using coordinate descent.
- * For full parity, BOBYQA would need to be implemented.
+ * BOBYQA (Bound Optimization BY Quadratic Approximation) is a
+ * derivative-free optimizer that uses quadratic interpolation
+ * models within a trust region framework.
+ */
+function runBobyqa(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): OptimizationResult {
+  const trustRegion = objective.getInitialTrustRegionRadius(startPoint);
+  const stoppingTrustRegion = objective.getStoppingTrustRegionRadius();
+  const nrInterpolations = objective.getNrInterpolations();
+
+  const optimizer = new BOBYQAOptimizer(
+    nrInterpolations,
+    trustRegion,
+    stoppingTrustRegion,
+    options.maxEvaluations ?? objective.getMaxEvaluations()
+  );
+
+  return optimizer.optimize(
+    (point) => objective.value(point),
+    objective.getLowerBounds(),
+    objective.getUpperBounds(),
+    startPoint
+  );
+}
+
+/**
+ * Run a simple local optimization using coordinate descent.
+ *
+ * This is used as a fallback for optimizer types that are not yet implemented.
  */
 function runLocalOptimization(
   objective: BaseObjectiveFunction,
@@ -221,7 +252,7 @@ export function optimizeObjectiveFunction(
     const optimizerType = objective.getOptimizerType();
 
     if (optimizerType === OptimizerType.DIRECT) {
-      // Two-stage: DIRECT for global, then local refinement
+      // Two-stage: DIRECT for global, then BOBYQA for local refinement
       onProgress("Running global optimization (DIRECT)...");
 
       const directResult = runDirect(objective, startPoint, {
@@ -233,24 +264,41 @@ export function optimizeObjectiveFunction(
         `After ${directResult.evaluations} evaluations, global optimizer found optimum ${directResult.value.toFixed(4)}`
       );
 
-      // Refine with local optimizer
-      onProgress("Refining with local optimization...");
-      const localResult = runLocalOptimization(objective, directResult.point, {
+      // Refine with BOBYQA (matching Java's two-stage pipeline)
+      onProgress("Refining with BOBYQA...");
+      const bobyqaResult = runBobyqa(objective, directResult.point, {
         ...options,
         maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
       });
 
-      if (localResult.value < directResult.value) {
-        finalPoint = localResult.point;
+      if (bobyqaResult.value < directResult.value) {
+        finalPoint = bobyqaResult.point;
+        onProgress(
+          `BOBYQA refined to ${bobyqaResult.value.toFixed(4)} in ${bobyqaResult.evaluations} evaluations`
+        );
       } else {
         finalPoint = directResult.point;
         onProgress(
-          `Local optimizer did not improve (${localResult.value.toFixed(4)})`
+          `BOBYQA did not improve (${bobyqaResult.value.toFixed(4)})`
         );
       }
+    } else if (optimizerType === OptimizerType.BOBYQA) {
+      // Use BOBYQA directly for local optimization
+      onProgress("Running optimization (BOBYQA)...");
+      const result = runBobyqa(objective, startPoint, options);
+      finalPoint = result.point;
+      onProgress(
+        `BOBYQA found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+      );
+    } else if (optimizerType === OptimizerType.BRENT) {
+      // Univariate optimization - use coordinate descent for now
+      // TODO: Implement proper Brent optimizer for 1D
+      onProgress("Running optimization (univariate)...");
+      const result = runLocalOptimization(objective, startPoint, options);
+      finalPoint = result.point;
     } else {
-      // Use local optimization only for other optimizer types
-      onProgress("Running optimization...");
+      // Fallback to coordinate descent for unimplemented optimizer types
+      onProgress(`Running optimization (fallback for ${optimizerType})...`);
       const result = runLocalOptimization(objective, startPoint, options);
       finalPoint = result.point;
     }
