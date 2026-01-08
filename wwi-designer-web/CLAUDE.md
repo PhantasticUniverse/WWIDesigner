@@ -66,8 +66,12 @@ While unit tests verify numerical parity with Java, real-world testing with actu
 |-----------------|-------------------|--------|-------|
 | **NAF** | Hole Size | ✅ Tested | Working correctly |
 | **NAF** | Hole Position | ⏳ Pending | |
+| **NAF** | Hole Groups | ⏳ Pending | |
 | **NAF** | Bore/Taper | ⏳ Pending | |
+| **NAF** | Fipple Factor | ⏳ Pending | 1D Brent optimizer |
+| **NAF** | Beta/Embouchure | ⏳ Pending | |
 | **NAF** | Combined (holes + taper) | ⏳ Pending | |
+| **NAF** | Hemi-Head | ⏳ Pending | NAF-specific |
 | **Whistle** | All | ⏳ Pending | |
 | **Flute** | All | ⏳ Pending | |
 
