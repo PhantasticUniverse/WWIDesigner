@@ -19,6 +19,35 @@ export {
   type BOBYQAOptions,
 } from "./bobyqa-optimizer.ts";
 
+// Brent univariate optimizer
+export {
+  BrentOptimizer,
+  brentMinimize,
+  type BrentOptimizationResult,
+  type BrentOptimizerOptions,
+} from "./brent-optimizer.ts";
+
+// CMA-ES evolutionary optimizer
+export {
+  CMAESOptimizer,
+  cmaesMinimize,
+  type CMAESOptions,
+} from "./cmaes-optimizer.ts";
+
+// Simplex (Nelder-Mead) optimizer
+export {
+  SimplexOptimizer,
+  simplexMinimize,
+  type SimplexOptimizerOptions,
+} from "./simplex-optimizer.ts";
+
+// Powell conjugate direction optimizer
+export {
+  PowellOptimizer,
+  powellMinimize,
+  type PowellOptimizerOptions,
+} from "./powell-optimizer.ts";
+
 // Evaluators
 export {
   type IEvaluator,

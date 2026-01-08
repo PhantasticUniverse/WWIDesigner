@@ -16,6 +16,10 @@
 
 import { DIRECTOptimizer, type OptimizationResult } from "./direct-optimizer.ts";
 import { BOBYQAOptimizer } from "./bobyqa-optimizer.ts";
+import { BrentOptimizer } from "./brent-optimizer.ts";
+import { CMAESOptimizer } from "./cmaes-optimizer.ts";
+import { SimplexOptimizer } from "./simplex-optimizer.ts";
+import { PowellOptimizer } from "./powell-optimizer.ts";
 import {
   BaseObjectiveFunction,
   OptimizerType,
@@ -138,6 +142,150 @@ function runBobyqa(
 }
 
 /**
+ * Optimize using Brent's algorithm for univariate (1D) functions.
+ *
+ * Brent's method combines parabolic interpolation with golden section
+ * search for fast, reliable convergence on single-variable problems.
+ */
+function runBrent(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): OptimizationResult {
+  if (objective.getNrDimensions() !== 1) {
+    throw new Error("Brent optimizer requires exactly 1 dimension");
+  }
+
+  const optimizer = new BrentOptimizer({
+    relativeTolerance: 1e-6,
+    absoluteTolerance: 1e-14,
+    maxEvaluations: options.maxEvaluations ?? objective.getMaxEvaluations(),
+  });
+
+  const lowerBounds = objective.getLowerBounds();
+  const upperBounds = objective.getUpperBounds();
+
+  // Create a univariate wrapper function
+  const univariateFunc = (x: number) => objective.value([x]);
+
+  const result = optimizer.optimize(
+    univariateFunc,
+    lowerBounds[0]!,
+    upperBounds[0]!,
+    startPoint[0]
+  );
+
+  return {
+    point: [result.point],
+    value: result.value,
+    evaluations: result.evaluations,
+    iterations: result.iterations,
+    converged: result.converged,
+  };
+}
+
+/**
+ * Optimize using CMA-ES (Covariance Matrix Adaptation Evolution Strategy).
+ *
+ * A population-based evolutionary algorithm that adapts the covariance
+ * matrix of a multivariate normal distribution to sample better solutions.
+ */
+function runCmaes(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): OptimizationResult {
+  const lowerBounds = objective.getLowerBounds();
+  const upperBounds = objective.getUpperBounds();
+  const n = startPoint.length;
+
+  // Calculate sigma (step sizes) as 0.2 * range per dimension
+  const sigma = new Array(n);
+  for (let i = 0; i < n; i++) {
+    sigma[i] = 0.2 * (upperBounds[i]! - lowerBounds[i]!);
+  }
+
+  // Population size: 5 + 5*log(n) as per Java implementation
+  const populationSize = 5 + Math.floor(5 * Math.log(n));
+
+  const optimizer = new CMAESOptimizer({
+    maxEvaluations: options.maxEvaluations ?? objective.getMaxEvaluations(),
+    stopFitness: options.targetValue ?? 0.0001,
+    sigma,
+    populationSize,
+    relativeTolerance: 1e-6,
+    absoluteTolerance: 1e-14,
+  });
+
+  return optimizer.optimize(
+    (point) => objective.value(point),
+    lowerBounds,
+    upperBounds,
+    startPoint
+  );
+}
+
+/**
+ * Optimize using Simplex (Nelder-Mead) method.
+ *
+ * A derivative-free method using a geometric simplex that moves
+ * through the search space via reflection, expansion, and contraction.
+ */
+function runSimplex(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): OptimizationResult {
+  const lowerBounds = objective.getLowerBounds();
+  const upperBounds = objective.getUpperBounds();
+
+  // Calculate step sizes (25% of distance to more distant bound) as per Java
+  const stepSizes = objective.getSimplexStepSize();
+
+  const optimizer = new SimplexOptimizer({
+    maxEvaluations: options.maxEvaluations ?? objective.getMaxEvaluations(),
+    relativeTolerance: 1e-6,
+    absoluteTolerance: 1e-14,
+    stepSizes,
+  });
+
+  return optimizer.optimize(
+    (point) => objective.value(point),
+    lowerBounds,
+    upperBounds,
+    startPoint
+  );
+}
+
+/**
+ * Optimize using Powell's conjugate direction method.
+ *
+ * A derivative-free method using successive line searches
+ * along conjugate directions.
+ */
+function runPowell(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): OptimizationResult {
+  const lowerBounds = objective.getLowerBounds();
+  const upperBounds = objective.getUpperBounds();
+
+  const optimizer = new PowellOptimizer({
+    maxEvaluations: options.maxEvaluations ?? objective.getMaxEvaluations(),
+    relativeTolerance: 1e-6,
+    absoluteTolerance: 1e-14,
+  });
+
+  return optimizer.optimize(
+    (point) => objective.value(point),
+    lowerBounds,
+    upperBounds,
+    startPoint
+  );
+}
+
+/**
  * Run a simple local optimization using coordinate descent.
  *
  * This is used as a fallback for optimizer types that are not yet implemented.
@@ -255,7 +403,22 @@ function doSingleStart(
   } else if (optimizerType === OptimizerType.BOBYQA) {
     result = runBobyqa(objective, startPoint, options);
   } else if (optimizerType === OptimizerType.BRENT) {
-    result = runLocalOptimization(objective, startPoint, options);
+    // Brent optimizer for univariate (1D) problems
+    if (objective.getNrDimensions() === 1) {
+      result = runBrent(objective, startPoint, options);
+    } else {
+      // Fall back to BOBYQA for multivariate
+      result = runBobyqa(objective, startPoint, options);
+    }
+  } else if (optimizerType === OptimizerType.CMAES) {
+    // CMA-ES evolutionary optimizer
+    result = runCmaes(objective, startPoint, options);
+  } else if (optimizerType === OptimizerType.SIMPLEX) {
+    // Simplex (Nelder-Mead) optimizer
+    result = runSimplex(objective, startPoint, options);
+  } else if (optimizerType === OptimizerType.POWELL) {
+    // Powell's conjugate direction optimizer
+    result = runPowell(objective, startPoint, options);
   } else {
     result = runLocalOptimization(objective, startPoint, options);
   }
@@ -548,11 +711,47 @@ export function optimizeObjectiveFunction(
           );
         }
       } else if (optimizerType === OptimizerType.BRENT) {
-        // Univariate optimization - use coordinate descent for now
-        // TODO: Implement proper Brent optimizer for 1D
-        onProgress("Running optimization (univariate)...");
-        const result = runLocalOptimization(objective, startPoint, options);
+        // Brent's method for univariate (1D) optimization
+        if (objective.getNrDimensions() === 1) {
+          onProgress("Running optimization (Brent univariate)...");
+          const result = runBrent(objective, startPoint, options);
+          finalPoint = result.point;
+          onProgress(
+            `Brent found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+          );
+        } else {
+          // Fall back to BOBYQA for multivariate problems
+          onProgress("Running optimization (BOBYQA, Brent fallback for multivariate)...");
+          const result = runBobyqa(objective, startPoint, options);
+          finalPoint = result.point;
+          onProgress(
+            `BOBYQA found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+          );
+        }
+      } else if (optimizerType === OptimizerType.CMAES) {
+        // CMA-ES evolutionary optimizer
+        onProgress("Running optimization (CMA-ES)...");
+        const result = runCmaes(objective, startPoint, options);
         finalPoint = result.point;
+        onProgress(
+          `CMA-ES found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+        );
+      } else if (optimizerType === OptimizerType.SIMPLEX) {
+        // Nelder-Mead simplex optimizer
+        onProgress("Running optimization (Simplex/Nelder-Mead)...");
+        const result = runSimplex(objective, startPoint, options);
+        finalPoint = result.point;
+        onProgress(
+          `Simplex found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+        );
+      } else if (optimizerType === OptimizerType.POWELL) {
+        // Powell conjugate direction optimizer
+        onProgress("Running optimization (Powell)...");
+        const result = runPowell(objective, startPoint, options);
+        finalPoint = result.point;
+        onProgress(
+          `Powell found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+        );
       } else {
         // Fallback to coordinate descent for unimplemented optimizer types
         onProgress(`Running optimization (fallback for ${optimizerType})...`);

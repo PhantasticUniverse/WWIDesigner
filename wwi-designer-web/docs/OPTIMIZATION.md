@@ -877,7 +877,241 @@ interface BOBYQAOptions {
 | Unknown landscape, need global search | DIRECT |
 | Near optimum, need refinement | BOBYQA |
 | Single-variable optimization | Brent |
+| Population-based evolution | CMA-ES |
+| Simple derivative-free | Simplex |
+| Direction-based search | Powell |
 | Standard two-stage workflow | DIRECT → BOBYQA |
+
+## Brent Algorithm (Univariate)
+
+### Reference
+
+> Brent, R.P. (1973). Algorithms for Minimization without Derivatives. Prentice-Hall, Englewood Cliffs, NJ.
+
+### Key Idea
+
+Brent's method combines **parabolic interpolation** for fast convergence with **golden section search** for guaranteed convergence:
+
+1. Maintains a bracket [a, b] containing the minimum
+2. Tries parabolic interpolation through 3 points
+3. Falls back to golden section if parabolic step is invalid
+4. Iteratively narrows the bracket until convergence
+
+```
+Brent's Method Concept:
+
+f(x) │    ●
+     │   / \     ← Parabolic fit through 3 points
+     │  ●   ●
+     │ /     \   → Predicts minimum location
+     │●       ●
+     └─────────────── x
+     a         b
+```
+
+### Configuration
+
+```typescript
+interface BrentOptimizerOptions {
+  relativeTolerance?: number;   // Default: 1e-6
+  absoluteTolerance?: number;   // Default: 1e-14
+  maxEvaluations?: number;      // Default: 10000
+  maxIterations?: number;       // Default: unlimited
+}
+```
+
+### Usage
+
+```typescript
+import { brentMinimize } from "./optimization/brent-optimizer.ts";
+
+// Find minimum of f(x) = (x - 3)^2 on [0, 10]
+const result = brentMinimize(
+  (x) => (x - 3) * (x - 3),
+  0,      // lower bound
+  10,     // upper bound
+  5       // starting point
+);
+
+console.log(result.point);   // ≈ 3
+console.log(result.value);   // ≈ 0
+```
+
+## CMA-ES Algorithm
+
+### Reference
+
+> Hansen, N. (2016). The CMA Evolution Strategy: A Tutorial.
+
+### Key Idea
+
+CMA-ES (Covariance Matrix Adaptation Evolution Strategy) is a **population-based evolutionary algorithm** that:
+
+1. Samples a population of candidate solutions
+2. Selects the best candidates
+3. Updates the covariance matrix to adapt search direction
+4. Repeats until convergence
+
+```
+CMA-ES Evolution:
+
+Generation 1:    Generation 2:    Generation 3:
+    ●  ●             ●                ●
+  ●    ●  ●       ●    ●           ●  ●
+    ●                ●  ●             ●
+  ●    ●           ●                  ●
+
+   Random         Covariance        Concentrated
+   sampling       adapts            at optimum
+```
+
+### Configuration
+
+```typescript
+interface CMAESOptions {
+  maxEvaluations?: number;   // Default: 10000
+  populationSize?: number;   // Default: 5 + 5*log(n)
+  sigma?: number[];          // Initial step sizes (default: 0.2 * range)
+  stopFitness?: number;      // Target value to stop
+}
+```
+
+### Usage
+
+```typescript
+import { cmaesMinimize } from "./optimization/cmaes-optimizer.ts";
+
+// Find minimum of Rosenbrock function
+const result = cmaesMinimize(
+  (x) => {
+    const a = 1 - x[0];
+    const b = x[1] - x[0] * x[0];
+    return a * a + 100 * b * b;
+  },
+  [-5, -5],  // lower bounds
+  [5, 5],    // upper bounds
+  [0, 0],    // starting point
+  { maxEvaluations: 5000 }
+);
+
+console.log(result.point);   // ≈ [1, 1]
+```
+
+## Simplex (Nelder-Mead) Algorithm
+
+### Reference
+
+> Nelder, J.A., Mead, R. (1965). A simplex method for function minimization. The Computer Journal, 7(4), 308-313.
+
+### Key Idea
+
+The Nelder-Mead simplex method uses a geometric figure (simplex) that moves through parameter space:
+
+1. Start with n+1 vertices in n dimensions
+2. **Reflect** the worst vertex through the centroid
+3. **Expand** if improvement is large
+4. **Contract** if improvement is small
+5. **Shrink** the entire simplex if stuck
+
+```
+Simplex Operations (2D):
+
+    Original        Reflection       Expansion
+       ●                ●               ●
+      / \              / \             / \
+     ●───●  worst→    ●───●───○       ●───●───────○
+
+    Contraction      Shrink
+       ●               ●
+      /|\             /|\
+     ●─○─●           ○─○─○   (all vertices move toward best)
+```
+
+### Configuration
+
+```typescript
+interface SimplexOptimizerOptions {
+  maxEvaluations?: number;    // Default: 10000
+  maxIterations?: number;     // Default: unlimited
+  functionTolerance?: number; // Default: 1e-8
+  pointTolerance?: number;    // Default: 1e-6
+  stepSizes?: number[];       // Initial simplex size (default: 0.25 * range)
+}
+```
+
+### Usage
+
+```typescript
+import { simplexMinimize } from "./optimization/simplex-optimizer.ts";
+
+const result = simplexMinimize(
+  (x) => x[0] * x[0] + x[1] * x[1],  // Sphere function
+  [-5, -5],
+  [5, 5],
+  [2, 2],
+  { maxEvaluations: 2000 }
+);
+
+console.log(result.point);   // ≈ [0, 0]
+```
+
+## Powell Algorithm
+
+### Reference
+
+> Powell, M.J.D. (1964). An efficient method for finding the minimum of a function of several variables without calculating derivatives. The Computer Journal, 7(2), 155-162.
+
+### Key Idea
+
+Powell's method performs successive **line searches** along a set of directions:
+
+1. Start with coordinate axes as search directions
+2. Perform line search along each direction (using Brent)
+3. Compute new direction from overall displacement
+4. Update directions to become **conjugate**
+5. Repeat until convergence
+
+```
+Powell's Conjugate Directions:
+
+Initial directions:    After adaptation:
+     y                      y
+     ↑                      ↑
+     │    →x               /\   ← Aligned with
+     │                    /  \     function contours
+
+Coordinate axes      Conjugate directions
+(suboptimal)         (efficient)
+```
+
+### Configuration
+
+```typescript
+interface PowellOptimizerOptions {
+  maxEvaluations?: number;              // Default: 10000
+  maxIterations?: number;               // Default: unlimited
+  relativeTolerance?: number;           // Default: 1e-6
+  absoluteTolerance?: number;           // Default: 1e-14
+  lineSearchRelativeTolerance?: number; // Default: 1e-6
+  lineSearchAbsoluteTolerance?: number; // Default: 1e-14
+}
+```
+
+### Usage
+
+```typescript
+import { powellMinimize } from "./optimization/powell-optimizer.ts";
+
+const result = powellMinimize(
+  (x) => x[0] * x[0] + 10 * x[1] * x[1],  // Ellipsoid
+  [-5, -5],
+  [5, 5],
+  [3, 3],
+  { maxEvaluations: 3000 }
+);
+
+console.log(result.point);   // ≈ [0, 0]
+```
 
 ## Two-Stage Optimization Pipeline
 

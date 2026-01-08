@@ -5,9 +5,9 @@ Systematic plan to achieve full optimizer parity between Java WWIDesigner and Ty
 
 ## Current State
 - **Acoustic Engine:** 100% parity
-- **Optimizer:** 98% parity (DIRECT + BOBYQA + Multi-Start + Two-Stage implemented)
+- **Optimizer:** 100% parity (DIRECT + BOBYQA + Brent + CMA-ES + Simplex + Powell + Multi-Start + Two-Stage implemented)
 - **Objective Functions:** 51/51 implemented (100% complete - verified against Java)
-- **Tests:** 696 passing
+- **Tests:** 772 passing (355 optimization tests)
 
 ---
 
@@ -157,17 +157,34 @@ All 51 objective functions from Java have been implemented and verified (100% pa
 
 ---
 
-## Phase 6: Additional Algorithms (Lower Priority)
+## Phase 6: Additional Algorithms ✅ COMPLETE
 **Goal:** Complete algorithm coverage
 
-### 6.1 Brent Optimizer
-- [ ] Port univariate Brent optimizer
-- [ ] Use for single-variable objectives (FippleFactor, etc.)
+### 6.1 Brent Optimizer ✅
+- [x] Port univariate Brent optimizer (brent-optimizer.ts)
+- [x] Parabolic interpolation + golden section search
+- [x] Used for single-variable objectives (FippleFactor, WindowHeight, etc.)
+- [x] 24 tests in brent-optimizer.test.ts
 
-### 6.2 Other Algorithms
-- [ ] CMAES (population-based)
-- [ ] Simplex (Nelder-Mead)
-- [ ] Powell's method
+### 6.2 CMA-ES Optimizer ✅
+- [x] Port CMA-ES evolutionary optimizer (cmaes-optimizer.ts)
+- [x] Covariance Matrix Adaptation Evolution Strategy
+- [x] Population-based for multivariate problems
+- [x] 16 tests in cmaes-optimizer.test.ts
+
+### 6.3 Simplex (Nelder-Mead) Optimizer ✅
+- [x] Port Simplex optimizer (simplex-optimizer.ts)
+- [x] Reflection, expansion, contraction, shrinkage operations
+- [x] Derivative-free optimization for multivariate problems
+- [x] 18 tests in simplex-optimizer.test.ts
+
+### 6.4 Powell Optimizer ✅
+- [x] Port Powell conjugate direction optimizer (powell-optimizer.ts)
+- [x] Successive line searches using Brent optimizer
+- [x] Direction update for conjugate directions
+- [x] 18 tests in powell-optimizer.test.ts
+
+**Parity Check:** All algorithms match Java Apache Commons Math implementations
 
 ---
 
