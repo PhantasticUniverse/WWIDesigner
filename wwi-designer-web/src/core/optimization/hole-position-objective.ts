@@ -388,6 +388,14 @@ export class HolePositionObjectiveFunction extends BaseObjectiveFunction {
   getLengthAdjustmentMode(): BoreLengthAdjustmentType {
     return this.lengthAdjustmentMode;
   }
+
+  getObjectiveFunctionName(): string {
+    return "HolePositionObjectiveFunction";
+  }
+
+  getDisplayName(): string {
+    return "Hole position optimizer";
+  }
 }
 
 /**
@@ -473,6 +481,14 @@ export class HoleSizeObjectiveFunction extends BaseObjectiveFunction {
 
     this.constraints.setLowerBounds(this.lowerBounds);
     this.constraints.setUpperBounds(this.upperBounds);
+  }
+
+  getObjectiveFunctionName(): string {
+    return "HoleSizeObjectiveFunction";
+  }
+
+  getDisplayName(): string {
+    return "Hole size optimizer";
   }
 }
 
@@ -636,6 +652,14 @@ export class HoleObjectiveFunction extends BaseObjectiveFunction {
 
     this.constraints.setLowerBounds(this.lowerBounds);
     this.constraints.setUpperBounds(this.upperBounds);
+  }
+
+  getObjectiveFunctionName(): string {
+    return "HoleObjectiveFunction";
+  }
+
+  getDisplayName(): string {
+    return "Hole position & size optimizer";
   }
 }
 

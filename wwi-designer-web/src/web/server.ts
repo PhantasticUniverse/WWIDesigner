@@ -151,10 +151,10 @@ async function handleOptimize(req: Request): Promise<Response> {
 
     return Response.json({
       optimizedInstrument: objective.getInstrument(),
-      initialError: result.initialValue,
-      finalError: result.finalValue,
-      iterations: result.iterations,
-      converged: result.converged,
+      initialError: result.initialNorm,
+      finalError: result.finalNorm,
+      evaluations: result.evaluations,
+      success: result.success,
       objectiveFunction: objectiveFunction,
       dimensions: objective.getNrDimensions(),
     });
