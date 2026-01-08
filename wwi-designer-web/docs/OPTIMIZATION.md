@@ -709,6 +709,105 @@ console.log(`  Converged: ${result.converged}`);
 
 3. **WWIDesigner Java source** - Original implementation by Steven G. Johnson (MIT), Burton Patkau
 
+## Objective Function Factory
+
+The factory provides a unified way to create any objective function by name, enabling dynamic selection from the UI.
+
+### Creating Objective Functions
+
+```typescript
+import {
+  createObjectiveFunction,
+  getObjectiveFunctionsByCategory,
+  getObjectiveFunctionNames,
+  OBJECTIVE_FUNCTION_INFO,
+} from "./optimization/objective-function-factory.ts";
+
+// Create by name
+const objective = createObjectiveFunction(
+  "HolePositionObjectiveFunction",
+  calculator,
+  tuning,
+  evaluator
+);
+
+// Get all available function names
+const names = getObjectiveFunctionNames();
+// ["FippleFactorObjectiveFunction", "HolePositionObjectiveFunction", ...]
+
+// Get functions grouped by category
+const byCategory = getObjectiveFunctionsByCategory();
+// {
+//   "Mouthpiece": [{ name: "FippleFactorObjectiveFunction", displayName: "Fipple factor", ... }],
+//   "Holes": [{ name: "HolePositionObjectiveFunction", ... }],
+//   ...
+// }
+
+// Get metadata for a specific function
+const info = OBJECTIVE_FUNCTION_INFO["HolePositionObjectiveFunction"];
+// { displayName: "Hole size & position", category: "Holes", description: "..." }
+```
+
+### Available Categories
+
+| Category | Description |
+|----------|-------------|
+| **Mouthpiece** | Fipple factor, window height, beta, airstream length |
+| **Holes** | Position, size, and combined hole optimization |
+| **Grouped Holes** | Holes in groups with equal spacing |
+| **Single Taper** | Single taper bore with various hole grouping options |
+| **Hemi-Head** | Single taper with hemispherical bore head (NAF) |
+| **Bore** | Bore length, diameter, position, and spacing |
+| **Combined** | Hole + bore combined optimization |
+| **Global** | Global optimizer variants (DIRECT) |
+| **Calibration** | Instrument calibration objectives |
+
+### API Endpoint Usage
+
+The web API accepts the objective function name directly:
+
+```typescript
+// POST /api/optimize
+const response = await fetch("/api/optimize", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    instrument,
+    tuning,
+    objectiveFunction: "FippleFactorObjectiveFunction", // Or any registered name
+    temperature: 20,
+    humidity: 45,
+  }),
+});
+
+const result = await response.json();
+// {
+//   optimizedInstrument: { ... },
+//   initialError: 245.3,
+//   finalError: 8.2,
+//   iterations: 523,
+//   converged: true,
+//   objectiveFunction: "FippleFactorObjectiveFunction",
+//   dimensions: 1
+// }
+```
+
+### Sidebar Integration
+
+The web UI sidebar shows available optimizers. Selecting one updates `state.selectedOptimizer`, which is passed to the API when clicking Optimize.
+
+```
+Optimizer (sidebar)
+├─ Fipple factor
+├─ Grouped-hole position & size
+├─ Hole size & position (default)
+├─ Hole size only
+├─ Single taper, grouped hole
+├─ Single taper, hemi-head, grouped hole
+├─ Single taper, hemi-head, no hole grouping
+└─ Single taper, no hole grouping
+```
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System overview

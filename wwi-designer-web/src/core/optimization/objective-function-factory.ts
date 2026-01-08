@@ -343,14 +343,36 @@ export const OBJECTIVE_FUNCTION_INFO: Record<
 };
 
 /**
+ * Create default hole groups - each hole in its own group.
+ * This provides no grouping, treating each hole independently.
+ */
+function getDefaultHoleGroups(tuning: Tuning): number[][] {
+  const groups: number[][] = [];
+  for (let i = 0; i < tuning.numberOfHoles; i++) {
+    groups.push([i]);
+  }
+  return groups;
+}
+
+/**
  * Create an objective function instance by name.
+ *
+ * @param name - Objective function class name
+ * @param calculator - Instrument calculator
+ * @param tuning - Target tuning
+ * @param evaluator - Evaluation function
+ * @param holeGroups - Optional hole groups for grouped-hole functions (defaults to one hole per group)
  */
 export function createObjectiveFunction(
   name: string,
   calculator: InstrumentCalculator,
   tuning: Tuning,
-  evaluator: IEvaluator
+  evaluator: IEvaluator,
+  holeGroups?: number[][]
 ): BaseObjectiveFunction {
+  // Get default hole groups if not provided
+  const groups = holeGroups ?? getDefaultHoleGroups(tuning);
+
   switch (name) {
     // Mouthpiece
     case "FippleFactorObjectiveFunction":
@@ -378,13 +400,13 @@ export function createObjectiveFunction(
 
     // Grouped holes
     case "HoleGroupPositionObjectiveFunction":
-      return new HoleGroupPositionObjectiveFunction(calculator, tuning, evaluator);
+      return new HoleGroupPositionObjectiveFunction(calculator, tuning, evaluator, groups);
     case "HoleGroupPositionFromTopObjectiveFunction":
-      return new HoleGroupPositionFromTopObjectiveFunction(calculator, tuning, evaluator);
+      return new HoleGroupPositionFromTopObjectiveFunction(calculator, tuning, evaluator, groups);
     case "HoleGroupObjectiveFunction":
-      return new HoleGroupObjectiveFunction(calculator, tuning, evaluator);
+      return new HoleGroupObjectiveFunction(calculator, tuning, evaluator, groups);
     case "HoleGroupFromTopObjectiveFunction":
-      return new HoleGroupFromTopObjectiveFunction(calculator, tuning, evaluator);
+      return new HoleGroupFromTopObjectiveFunction(calculator, tuning, evaluator, groups);
 
     // Single taper
     case "SingleTaperNoHoleGroupingObjectiveFunction":
@@ -392,9 +414,9 @@ export function createObjectiveFunction(
     case "SingleTaperNoHoleGroupingFromTopObjectiveFunction":
       return new SingleTaperNoHoleGroupingFromTopObjectiveFunction(calculator, tuning, evaluator);
     case "SingleTaperHoleGroupObjectiveFunction":
-      return new SingleTaperHoleGroupObjectiveFunction(calculator, tuning, evaluator);
+      return new SingleTaperHoleGroupObjectiveFunction(calculator, tuning, evaluator, groups);
     case "SingleTaperHoleGroupFromTopObjectiveFunction":
-      return new SingleTaperHoleGroupFromTopObjectiveFunction(calculator, tuning, evaluator);
+      return new SingleTaperHoleGroupFromTopObjectiveFunction(calculator, tuning, evaluator, groups);
     case "SingleTaperRatioObjectiveFunction":
       return new SingleTaperRatioObjectiveFunction(calculator, tuning, evaluator);
     case "SingleTaperSimpleRatioObjectiveFunction":
@@ -413,7 +435,8 @@ export function createObjectiveFunction(
       return new SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction(
         calculator,
         tuning,
-        evaluator
+        evaluator,
+        groups
       );
 
     // Bore

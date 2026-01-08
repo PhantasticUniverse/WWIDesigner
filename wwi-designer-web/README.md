@@ -55,6 +55,36 @@ See [CLAUDE.md](CLAUDE.md) for development guidelines, testing status, and Bun c
 | Whistle | `createWhistleCalculator()` | Tin whistle, penny whistle (thin-walled) |
 | Flute | `createFluteCalculator()` | Transverse flute (embouchure hole) |
 
+## Optimization
+
+The optimizer supports **48 objective functions** for different optimization goals:
+
+| Category | Examples |
+|----------|----------|
+| **Holes** | Hole position, size, or both |
+| **Grouped Holes** | Holes in groups with equal spacing |
+| **Single Taper** | Bore taper with various hole grouping |
+| **Hemi-Head** | NAF with hemispherical bore head |
+| **Bore** | Bore diameter, length, position |
+| **Mouthpiece** | Fipple factor, window height, beta |
+| **Combined** | Hole + bore combined optimization |
+
+```typescript
+import { createObjectiveFunction } from "./core/optimization/index.ts";
+
+// Create any objective function by name
+const objective = createObjectiveFunction(
+  "FippleFactorObjectiveFunction", // or any of 48 functions
+  calculator,
+  tuning,
+  evaluator
+);
+
+// Optimize
+const result = optimizeObjectiveFunction(objective, { maxIterations: 1000 });
+console.log(`Error: ${result.initialValue} → ${result.finalValue}`);
+```
+
 ## Usage Example
 
 ```typescript
