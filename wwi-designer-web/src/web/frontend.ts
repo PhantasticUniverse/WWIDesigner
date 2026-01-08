@@ -9,6 +9,8 @@ import type { Tuning, Fingering } from "../models/tuning.ts";
 import { parseInstrument, parseTuning, parseConstraints, constraintsToXml, constraintsToJson } from "../utils/xml-converter.ts";
 import type { Constraint } from "../core/optimization/constraints.ts";
 import { ConstraintType } from "../core/optimization/constraints.ts";
+import type { LengthType } from "../core/constants.ts";
+import { getMultiplierToMetres, getMultiplierFromMetres } from "../core/constants.ts";
 
 // Constraints data structure (matches API response)
 interface ConstraintsData {
@@ -60,6 +62,66 @@ const state: AppState = {
     lengthUnit: "MM",
   },
 };
+
+/**
+ * Convert all dimensional values in an instrument by a conversion factor.
+ * This is used when changing length units (e.g., MM to IN).
+ */
+function convertInstrumentDimensions(instrument: Instrument, factor: number): void {
+  // Convert mouthpiece position
+  instrument.mouthpiece.position *= factor;
+
+  // Convert bore diameter at mouthpiece if present
+  if (instrument.mouthpiece.boreDiameter) {
+    instrument.mouthpiece.boreDiameter *= factor;
+  }
+
+  // Convert fipple dimensions
+  if (instrument.mouthpiece.fipple) {
+    const f = instrument.mouthpiece.fipple;
+    if (f.windowWidth !== undefined) f.windowWidth *= factor;
+    if (f.windowLength !== undefined) f.windowLength *= factor;
+    if (f.windowHeight !== undefined) f.windowHeight *= factor;
+    if (f.windwayLength !== undefined) f.windwayLength *= factor;
+    if (f.windwayHeight !== undefined) f.windwayHeight *= factor;
+  }
+
+  // Convert embouchure hole dimensions
+  if (instrument.mouthpiece.embouchureHole) {
+    const e = instrument.mouthpiece.embouchureHole;
+    if (e.length !== undefined) e.length *= factor;
+    if (e.width !== undefined) e.width *= factor;
+    if (e.height !== undefined) e.height *= factor;
+    if (e.airstreamLength !== undefined) e.airstreamLength *= factor;
+    if (e.airstreamHeight !== undefined) e.airstreamHeight *= factor;
+  }
+
+  // Convert bore points
+  for (const bp of instrument.borePoint) {
+    bp.borePosition *= factor;
+    bp.boreDiameter *= factor;
+  }
+
+  // Convert holes
+  for (const hole of instrument.hole) {
+    hole.position *= factor;
+    hole.diameter *= factor;
+    hole.height *= factor;
+    if (hole.boreDiameter !== undefined) hole.boreDiameter *= factor;
+    if (hole.innerCurvatureRadius !== undefined) hole.innerCurvatureRadius *= factor;
+  }
+
+  // Convert termination
+  if (instrument.termination) {
+    instrument.termination.flangeDiameter *= factor;
+    if (instrument.termination.borePosition !== undefined) {
+      instrument.termination.borePosition *= factor;
+    }
+    if (instrument.termination.boreDiameter !== undefined) {
+      instrument.termination.boreDiameter *= factor;
+    }
+  }
+}
 
 // DOM Helpers
 const $ = <T extends HTMLElement>(selector: string): T | null =>
@@ -436,10 +498,25 @@ function bindInstrumentEditorEvents(tabId: string, instrumentId: string) {
     });
   });
 
-  // Length unit change
+  // Length unit change - convert all values when unit changes
   const lengthUnitSelect = $<HTMLSelectElement>(`#length-unit-${tabId}`);
   lengthUnitSelect?.addEventListener("change", () => {
-    updateInstrumentFromEditor(tabId, instrumentId);
+    const inst = state.instruments.get(instrumentId);
+    if (!inst) return;
+
+    const oldUnit = inst.lengthType as LengthType;
+    const newUnit = lengthUnitSelect.value as LengthType;
+
+    if (oldUnit !== newUnit) {
+      // Convert all dimensional values to new unit
+      const conversionFactor = getMultiplierFromMetres(newUnit) / getMultiplierFromMetres(oldUnit);
+      convertInstrumentDimensions(inst, conversionFactor);
+      inst.lengthType = newUnit;
+
+      // Re-render the editor with converted values
+      createInstrumentEditor(inst, instrumentId);
+      log(`Converted instrument dimensions from ${oldUnit} to ${newUnit}`, "info");
+    }
   });
 
   // Termination changes
