@@ -96,12 +96,24 @@ function parseXml(xml: string): XmlNode | null {
       // Text content
       const text = match[3]!.trim();
       if (text && current) {
-        current.text = text;
+        current.text = decodeXmlEntities(text);
       }
     }
   }
 
   return root;
+}
+
+/**
+ * Decode XML entities in text content
+ */
+function decodeXmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
 }
 
 /**
