@@ -165,6 +165,9 @@ async function handleOptimize(req: Request): Promise<Response> {
 
     // Log optimization start (matching Java format)
     console.log(`System has ${nrDimensions} optimization variables and ${nrTargetNotes} target notes.`);
+    if (useDirectOptimizer) {
+      console.log("Using DIRECT global optimizer (slow & thorough)...");
+    }
 
     const startTime = performance.now();
 
@@ -199,6 +202,7 @@ async function handleOptimize(req: Request): Promise<Response> {
       initialError: result.initialNorm,
       finalError: result.finalNorm,
       evaluations: result.evaluations,
+      tunings: result.tunings,
       success: result.success,
       objectiveFunction: objectiveFunction,
       dimensions: nrDimensions,

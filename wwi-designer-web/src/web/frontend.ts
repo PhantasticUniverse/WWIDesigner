@@ -1209,6 +1209,9 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, object
     log(`After ${data.evaluations} evaluations, optimizer found optimum ${data.finalError}`, "info");
     log(`Final error:  ${data.finalError}`, "info");
     log(`Residual error ratio: ${data.residualRatio?.toFixed(6) || (data.finalError / data.initialError).toFixed(6)}`, "info");
+    if (data.tunings) {
+      log(`Performed ${data.tunings} tuning calculations in ${data.evaluations} evaluations.`, "info");
+    }
     log(`Elapsed time: ${data.elapsedTime?.toFixed(1) || "N/A"} seconds.`, "info");
     log(`Optimization complete!`, "success");
 
