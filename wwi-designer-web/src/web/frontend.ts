@@ -6,15 +6,33 @@
 
 import type { Instrument, BorePoint, Hole } from "../models/instrument.ts";
 import type { Tuning, Fingering } from "../models/tuning.ts";
-import { parseInstrument, parseTuning } from "../utils/xml-converter.ts";
+import { parseInstrument, parseTuning, parseConstraints, constraintsToXml, constraintsToJson } from "../utils/xml-converter.ts";
+import type { Constraint } from "../core/optimization/constraints.ts";
+import { ConstraintType } from "../core/optimization/constraints.ts";
+
+// Constraints data structure (matches API response)
+interface ConstraintsData {
+  constraintsName: string;
+  objectiveDisplayName: string;
+  objectiveFunctionName: string;
+  numberOfHoles: number;
+  lengthType: string;
+  constraints: Constraint[];
+  lowerBounds: number[];
+  upperBounds: number[];
+  holeGroups?: number[][];
+  dimensions?: number;
+}
 
 // Application State
 interface AppState {
   activeTab: string;
   instruments: Map<string, Instrument>;
   tunings: Map<string, Tuning>;
+  constraints: Map<string, ConstraintsData>;
   selectedInstrument: string | null;
   selectedTuning: string | null;
+  selectedConstraints: string | null;
   selectedOptimizer: string;
   selectedMultistart: string;
   preferences: {
@@ -29,8 +47,10 @@ const state: AppState = {
   activeTab: "welcome",
   instruments: new Map(),
   tunings: new Map(),
+  constraints: new Map(),
   selectedInstrument: null,
   selectedTuning: null,
+  selectedConstraints: null,
   selectedOptimizer: "HolePositionObjectiveFunction",
   selectedMultistart: "none",
   preferences: {
@@ -1202,6 +1222,7 @@ function createNewTuning() {
 function updateSidebar() {
   const instrumentsList = $("#instruments-list");
   const tuningsList = $("#tunings-list");
+  const constraintsList = $("#constraints-list");
 
   if (instrumentsList) {
     instrumentsList.innerHTML = "";
@@ -1235,13 +1256,51 @@ function updateSidebar() {
     });
   }
 
-  // Expand sections that have items (instruments/tunings only)
+  if (constraintsList) {
+    constraintsList.innerHTML = "";
+    // Add "Load Default" option
+    const loadDefaultLi = document.createElement("li");
+    loadDefaultLi.textContent = "+ Load Default Constraints";
+    loadDefaultLi.className = "action-item";
+    loadDefaultLi.addEventListener("click", () => {
+      loadDefaultConstraints();
+    });
+    constraintsList.appendChild(loadDefaultLi);
+
+    // Add "Open File" option
+    const openFileLi = document.createElement("li");
+    openFileLi.textContent = "+ Open Constraints File...";
+    openFileLi.className = "action-item";
+    openFileLi.addEventListener("click", () => {
+      importConstraintsFile();
+    });
+    constraintsList.appendChild(openFileLi);
+
+    // List loaded constraints
+    state.constraints.forEach((constraints, id) => {
+      const li = document.createElement("li");
+      li.textContent = constraints.constraintsName || "Untitled";
+      li.dataset.id = id;
+      li.className = id === state.selectedConstraints ? "selected" : "";
+      li.addEventListener("click", () => {
+        state.selectedConstraints = id;
+        updateSidebar();
+        createConstraintsEditor(constraints, id);
+      });
+      constraintsList.appendChild(li);
+    });
+  }
+
+  // Expand sections that have items
   $$(".tree-header").forEach((header) => {
     const category = (header as HTMLElement).dataset.category;
     if (category === "instruments" && state.instruments.size > 0) {
       header.classList.add("expanded");
     }
     if (category === "tunings" && state.tunings.size > 0) {
+      header.classList.add("expanded");
+    }
+    if (category === "constraints" && state.constraints.size > 0) {
       header.classList.add("expanded");
     }
   });
@@ -1515,6 +1574,292 @@ function importTuningFile() {
     }
   };
   input.click();
+}
+
+// ============================================================================
+// Constraints Handling
+// ============================================================================
+
+/**
+ * Load default constraints for the current optimizer and instrument/tuning.
+ */
+async function loadDefaultConstraints() {
+  if (!state.selectedInstrument || !state.selectedTuning) {
+    log("Please select an instrument and tuning first", "warning");
+    return;
+  }
+
+  const instrument = state.instruments.get(state.selectedInstrument);
+  const tuning = state.tunings.get(state.selectedTuning);
+
+  if (!instrument || !tuning) {
+    log("Missing instrument or tuning", "error");
+    return;
+  }
+
+  log(`Loading default constraints for ${state.selectedOptimizer}...`, "info");
+
+  try {
+    const response = await fetch("/api/constraints/get", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instrument,
+        tuning,
+        objectiveFunction: state.selectedOptimizer,
+        intent: "default",
+        temperature: state.preferences.temperature,
+        humidity: state.preferences.humidity,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      log(`Error: ${data.error}`, "error");
+      return;
+    }
+
+    const id = `constraints-${Date.now()}`;
+    state.constraints.set(id, data);
+    state.selectedConstraints = id;
+    updateSidebar();
+    createConstraintsEditor(data, id);
+    log(`Loaded default constraints for ${data.objectiveDisplayName}`, "success");
+  } catch (error) {
+    log(`Failed to load constraints: ${error}`, "error");
+  }
+}
+
+/**
+ * Import constraints from a file.
+ */
+function importConstraintsFile() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".xml,.json";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const response = await fetch("/api/constraints/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: text,
+          lengthType: state.preferences.lengthUnit,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        log(`Error: ${data.error}`, "error");
+        return;
+      }
+
+      const id = `imported-constraints-${Date.now()}`;
+      state.constraints.set(id, data);
+      state.selectedConstraints = id;
+      updateSidebar();
+      createConstraintsEditor(data, id);
+      log(`Imported constraints: ${data.constraintsName}`, "success");
+    } catch (error) {
+      log(`Failed to import constraints: ${error}`, "error");
+    }
+  };
+  input.click();
+}
+
+/**
+ * Export constraints to a file.
+ */
+async function exportConstraintsFile(constraintsId: string, format: "xml" | "json" = "xml") {
+  const constraintsData = state.constraints.get(constraintsId);
+  if (!constraintsData) {
+    log("No constraints to export", "warning");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/constraints/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        constraints: constraintsData,
+        format,
+      }),
+    });
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${constraintsData.constraintsName || "constraints"}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    log(`Exported constraints to ${format.toUpperCase()}`, "success");
+  } catch (error) {
+    log(`Failed to export constraints: ${error}`, "error");
+  }
+}
+
+/**
+ * Create a constraints editor panel.
+ */
+function createConstraintsEditor(constraintsData: ConstraintsData, id: string): string {
+  const tabId = createTab(id, constraintsData.constraintsName || "Constraints");
+  const panel = $(`#panel-${tabId}`);
+  if (!panel) return tabId;
+
+  // Group constraints by category
+  const byCategory = new Map<string, { constraint: Constraint; index: number }[]>();
+  constraintsData.constraints.forEach((c, i) => {
+    const cat = c.category || "General";
+    if (!byCategory.has(cat)) {
+      byCategory.set(cat, []);
+    }
+    byCategory.get(cat)!.push({ constraint: c, index: i });
+  });
+
+  panel.innerHTML = `
+    <div class="editor-container">
+      <div class="editor-header">
+        <h2>Constraints Editor</h2>
+        <div class="editor-actions">
+          <button class="btn" data-action="export-constraints-xml">Export XML</button>
+          <button class="btn" data-action="export-constraints-json">Export JSON</button>
+          <button class="btn primary" data-action="apply-constraints">Apply to Optimizer</button>
+        </div>
+      </div>
+
+      <!-- Constraints Info -->
+      <div class="editor-section">
+        <h3>Constraints Information</h3>
+        <div class="form-row">
+          <div class="form-group" style="flex: 2">
+            <label>Name</label>
+            <input type="text" id="constraints-name-${tabId}" value="${constraintsData.constraintsName || ""}" />
+          </div>
+          <div class="form-group">
+            <label>Dimensions</label>
+            <input type="text" readonly value="${constraintsData.dimensions || constraintsData.constraints.length}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex: 1">
+            <label>Objective Function</label>
+            <input type="text" readonly value="${constraintsData.objectiveDisplayName || constraintsData.objectiveFunctionName}" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Constraint Bounds by Category -->
+      ${Array.from(byCategory.entries()).map(([category, items]) => `
+        <div class="editor-section">
+          <h3>${category}</h3>
+          <table class="data-table constraints-table">
+            <thead>
+              <tr>
+                <th>Constraint</th>
+                <th>Type</th>
+                <th>Lower Bound</th>
+                <th>Upper Bound</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(({ constraint, index }) => `
+                <tr data-constraint-index="${index}">
+                  <td>${constraint.name}</td>
+                  <td>${constraint.type === ConstraintType.DIMENSIONAL ? "Length" : constraint.type === ConstraintType.DIMENSIONLESS ? "Ratio" : constraint.type}</td>
+                  <td><input type="number" step="any" data-field="lower" data-index="${index}" value="${constraintsData.lowerBounds[index] ?? constraint.lowerBound ?? 0}" /></td>
+                  <td><input type="number" step="any" data-field="upper" data-index="${index}" value="${constraintsData.upperBounds[index] ?? constraint.upperBound ?? 1e10}" /></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `).join("")}
+
+      ${constraintsData.holeGroups && constraintsData.holeGroups.length > 0 ? `
+        <div class="editor-section">
+          <h3>Hole Groups</h3>
+          <p>Holes that are optimized together:</p>
+          <ul>
+            ${constraintsData.holeGroups.map((group, i) => `<li>Group ${i + 1}: Holes ${group.join(", ")}</li>`).join("")}
+          </ul>
+        </div>
+      ` : ""}
+    </div>
+  `;
+
+  // Bind events
+  bindConstraintsEditorEvents(tabId, id);
+
+  return tabId;
+}
+
+/**
+ * Bind events for the constraints editor.
+ */
+function bindConstraintsEditorEvents(tabId: string, constraintsId: string) {
+  const panel = $(`#panel-${tabId}`);
+  if (!panel) return;
+
+  // Name change
+  const nameInput = panel.querySelector<HTMLInputElement>(`#constraints-name-${tabId}`);
+  nameInput?.addEventListener("change", () => {
+    const data = state.constraints.get(constraintsId);
+    if (data) {
+      data.constraintsName = nameInput.value;
+    }
+  });
+
+  // Bound changes
+  panel.querySelectorAll<HTMLInputElement>(".constraints-table input[data-field]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const data = state.constraints.get(constraintsId);
+      if (!data) return;
+
+      const index = parseInt(input.dataset.index || "0");
+      const field = input.dataset.field;
+      const value = parseFloat(input.value);
+
+      if (field === "lower") {
+        data.lowerBounds[index] = value;
+        if (data.constraints[index]) {
+          data.constraints[index].lowerBound = value;
+        }
+      } else if (field === "upper") {
+        data.upperBounds[index] = value;
+        if (data.constraints[index]) {
+          data.constraints[index].upperBound = value;
+        }
+      }
+    });
+  });
+
+  // Export buttons
+  panel.querySelector("[data-action='export-constraints-xml']")?.addEventListener("click", () => {
+    exportConstraintsFile(constraintsId, "xml");
+  });
+
+  panel.querySelector("[data-action='export-constraints-json']")?.addEventListener("click", () => {
+    exportConstraintsFile(constraintsId, "json");
+  });
+
+  // Apply constraints
+  panel.querySelector("[data-action='apply-constraints']")?.addEventListener("click", () => {
+    const data = state.constraints.get(constraintsId);
+    if (data) {
+      log(`Applied constraints: ${data.constraintsName}`, "success");
+      // Store for use in optimization
+      state.selectedConstraints = constraintsId;
+      updateSidebar();
+    }
+  });
 }
 
 

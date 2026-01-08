@@ -20,10 +20,26 @@ import type { LengthType } from "../../models/instrument.ts";
  * Type of constraint value.
  */
 export enum ConstraintType {
+  /** Boolean value constraint */
+  BOOLEAN = "BOOLEAN",
+  /** Integer value constraint */
+  INTEGER = "INTEGER",
   /** Dimensional value (length in mm or inches) */
   DIMENSIONAL = "DIMENSIONAL",
   /** Dimensionless ratio or multiplier */
   DIMENSIONLESS = "DIMENSIONLESS",
+}
+
+/**
+ * Intent for creating objective function with constraints.
+ */
+export enum ConstraintIntent {
+  /** Use actual constraints from instrument for optimization */
+  OPTIMIZATION = 0,
+  /** Create empty/unlimited constraints */
+  BLANK = 1,
+  /** Create default constraints with sensible bounds */
+  DEFAULT = 2,
 }
 
 /**

@@ -16,6 +16,11 @@ import type {
   LengthType,
 } from "../models/instrument.ts";
 import type { Tuning, Fingering, Note } from "../models/tuning.ts";
+import {
+  Constraints,
+  ConstraintType,
+  type Constraint,
+} from "../core/optimization/constraints.ts";
 
 // ============================================================================
 // Simple XML Parser (using regex for basic structure)
@@ -413,6 +418,234 @@ export function parseTuning(content: string): Tuning {
   }
   if (format === "json") {
     return parseTuningJson(content);
+  }
+  throw new Error("Unknown file format");
+}
+
+// ============================================================================
+// Constraints XML Converter
+// ============================================================================
+
+/**
+ * Parse constraint type from string
+ */
+function parseConstraintType(typeStr: string | undefined): ConstraintType {
+  if (!typeStr) return ConstraintType.DIMENSIONAL;
+  switch (typeStr.toUpperCase()) {
+    case "BOOLEAN":
+      return ConstraintType.BOOLEAN;
+    case "INTEGER":
+      return ConstraintType.INTEGER;
+    case "DIMENSIONAL":
+      return ConstraintType.DIMENSIONAL;
+    case "DIMENSIONLESS":
+      return ConstraintType.DIMENSIONLESS;
+    default:
+      return ConstraintType.DIMENSIONAL;
+  }
+}
+
+/**
+ * Convert XML constraints string to Constraints object.
+ * Parses the Java WWIDesigner constraints XML format.
+ */
+export function parseConstraintsXml(xml: string, lengthType: LengthType = "MM"): Constraints {
+  const root = parseXml(xml);
+  if (!root || root.tag !== "constraints") {
+    throw new Error("Invalid constraints XML: root element must be 'constraints'");
+  }
+
+  const constraints = new Constraints(lengthType);
+
+  // Parse constraint metadata
+  const constraintsName = root.attributes["constraintsName"] ?? getChildText(root, "constraintsName") ?? "Default";
+  constraints.setConstraintsName(constraintsName);
+
+  const objectiveDisplayName = getChildText(root, "objectiveDisplayName") ?? "";
+  constraints.setObjectiveDisplayName(objectiveDisplayName);
+
+  const objectiveFunctionName = getChildText(root, "objectiveFunctionName") ?? "";
+  constraints.setObjectiveFunctionName(objectiveFunctionName);
+
+  const numberOfHoles = getChildNumber(root, "numberOfHoles") ?? 0;
+  constraints.setNumberOfHoles(numberOfHoles);
+
+  // Parse individual constraints
+  const lowerBounds: number[] = [];
+  const upperBounds: number[] = [];
+
+  for (const cNode of findChildren(root, "constraint")) {
+    const displayName = getChildText(cNode, "displayName") ?? "";
+    const category = getChildText(cNode, "category") ?? "";
+    const type = parseConstraintType(getChildText(cNode, "type"));
+    const lowerBound = getChildNumber(cNode, "lowerBound");
+    const upperBound = getChildNumber(cNode, "upperBound");
+
+    const constraint: Constraint = {
+      name: displayName,
+      category,
+      type,
+      lowerBound,
+      upperBound,
+    };
+
+    constraints.addConstraint(constraint);
+    lowerBounds.push(lowerBound ?? 0);
+    upperBounds.push(upperBound ?? 1e10);
+  }
+
+  constraints.setLowerBounds(lowerBounds);
+  constraints.setUpperBounds(upperBounds);
+
+  // Parse hole groups if present
+  const holeGroupsNode = findChild(root, "holeGroups");
+  if (holeGroupsNode) {
+    const holeGroups: number[][] = [];
+    for (const groupNode of findChildren(holeGroupsNode, "holeGroup")) {
+      const group: number[] = [];
+      for (const holeNode of findChildren(groupNode, "hole")) {
+        const holeIdx = parseInt(holeNode.text, 10);
+        if (!Number.isNaN(holeIdx)) {
+          group.push(holeIdx);
+        }
+      }
+      if (group.length > 0) {
+        holeGroups.push(group);
+      }
+    }
+    if (holeGroups.length > 0) {
+      constraints.setHoleGroups(holeGroups);
+    }
+  }
+
+  return constraints;
+}
+
+/**
+ * Convert Constraints object to XML string.
+ * Generates Java WWIDesigner compatible constraints XML.
+ */
+export function constraintsToXml(constraints: Constraints): string {
+  const lines: string[] = [];
+  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
+  lines.push(`<constraints constraintsName="${escapeXml(constraints.getConstraintsName())}">`);
+
+  // Metadata
+  lines.push(`  <objectiveDisplayName>${escapeXml(constraints.getObjectiveDisplayName())}</objectiveDisplayName>`);
+  lines.push(`  <objectiveFunctionName>${escapeXml(constraints.getObjectiveFunctionName())}</objectiveFunctionName>`);
+  lines.push(`  <numberOfHoles>${constraints.getNumberOfHoles()}</numberOfHoles>`);
+
+  // Individual constraints
+  const constraintList = constraints.getConstraints();
+  const lowerBounds = constraints.getLowerBounds();
+  const upperBounds = constraints.getUpperBounds();
+
+  for (let i = 0; i < constraintList.length; i++) {
+    const c = constraintList[i]!;
+    lines.push("  <constraint>");
+    lines.push(`    <displayName>${escapeXml(c.name)}</displayName>`);
+    lines.push(`    <category>${escapeXml(c.category)}</category>`);
+    lines.push(`    <type>${c.type}</type>`);
+    lines.push(`    <lowerBound>${lowerBounds[i] ?? c.lowerBound ?? 0}</lowerBound>`);
+    lines.push(`    <upperBound>${upperBounds[i] ?? c.upperBound ?? 1e10}</upperBound>`);
+    lines.push("  </constraint>");
+  }
+
+  // Hole groups if present
+  const holeGroups = constraints.getHoleGroups();
+  if (holeGroups && holeGroups.length > 0) {
+    lines.push("  <holeGroups>");
+    for (const group of holeGroups) {
+      lines.push("    <holeGroup>");
+      for (const holeIdx of group) {
+        lines.push(`      <hole>${holeIdx}</hole>`);
+      }
+      lines.push("    </holeGroup>");
+    }
+    lines.push("  </holeGroups>");
+  }
+
+  lines.push("</constraints>");
+  return lines.join("\n");
+}
+
+/**
+ * Escape special XML characters
+ */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Convert Constraints to pretty-printed JSON
+ */
+export function constraintsToJson(constraints: Constraints): string {
+  const obj = {
+    constraintsName: constraints.getConstraintsName(),
+    objectiveDisplayName: constraints.getObjectiveDisplayName(),
+    objectiveFunctionName: constraints.getObjectiveFunctionName(),
+    numberOfHoles: constraints.getNumberOfHoles(),
+    lengthType: constraints.getLengthType(),
+    constraints: constraints.getConstraints(),
+    lowerBounds: constraints.getLowerBounds(),
+    upperBounds: constraints.getUpperBounds(),
+    holeGroups: constraints.getHoleGroups(),
+  };
+  return JSON.stringify(obj, null, 2);
+}
+
+/**
+ * Parse JSON string to Constraints
+ */
+export function parseConstraintsJson(json: string): Constraints {
+  const obj = JSON.parse(json);
+  const constraints = new Constraints(obj.lengthType ?? "MM");
+
+  constraints.setConstraintsName(obj.constraintsName ?? "Default");
+  constraints.setObjectiveDisplayName(obj.objectiveDisplayName ?? "");
+  constraints.setObjectiveFunctionName(obj.objectiveFunctionName ?? "");
+  constraints.setNumberOfHoles(obj.numberOfHoles ?? 0);
+
+  if (Array.isArray(obj.constraints)) {
+    for (const c of obj.constraints) {
+      constraints.addConstraint({
+        name: c.name ?? "",
+        category: c.category ?? "",
+        type: c.type ?? ConstraintType.DIMENSIONAL,
+        lowerBound: c.lowerBound,
+        upperBound: c.upperBound,
+      });
+    }
+  }
+
+  if (Array.isArray(obj.lowerBounds)) {
+    constraints.setLowerBounds(obj.lowerBounds);
+  }
+  if (Array.isArray(obj.upperBounds)) {
+    constraints.setUpperBounds(obj.upperBounds);
+  }
+  if (Array.isArray(obj.holeGroups)) {
+    constraints.setHoleGroups(obj.holeGroups);
+  }
+
+  return constraints;
+}
+
+/**
+ * Parse constraints from either XML or JSON
+ */
+export function parseConstraints(content: string, lengthType: LengthType = "MM"): Constraints {
+  const format = detectFormat(content);
+  if (format === "xml") {
+    return parseConstraintsXml(content, lengthType);
+  }
+  if (format === "json") {
+    return parseConstraintsJson(content);
   }
   throw new Error("Unknown file format");
 }

@@ -19,7 +19,7 @@ import type { Fingering, Tuning } from "../../models/tuning.ts";
 import type { Instrument } from "../../models/instrument.ts";
 import type { IInstrumentCalculator } from "../modelling/instrument-calculator.ts";
 import type { IEvaluator } from "./evaluator.ts";
-import { Constraints, ConstraintType, createConstraint } from "./constraints.ts";
+import { Constraints, ConstraintType, ConstraintIntent, createConstraint } from "./constraints.ts";
 import type { AbstractRangeProcessor } from "./range-processor.ts";
 
 /**
@@ -361,6 +361,91 @@ export abstract class BaseObjectiveFunction {
     this.upperBounds = constraints.getUpperBounds();
     this.constraints = constraints;
     this.validateBounds();
+  }
+
+  /**
+   * Get constraints based on specified intent.
+   * @param intent - The intent (OPTIMIZATION uses current instrument, DEFAULT uses sensible defaults,
+   *                 BLANK uses unlimited bounds)
+   * @returns Constraints for the specified intent
+   */
+  getConstraintsWithIntent(intent: ConstraintIntent): Constraints {
+    switch (intent) {
+      case ConstraintIntent.OPTIMIZATION:
+        return this.constraints.clone();
+      case ConstraintIntent.DEFAULT:
+        return this.getDefaultConstraints();
+      case ConstraintIntent.BLANK:
+        return this.getBlankConstraints();
+      default:
+        return this.constraints.clone();
+    }
+  }
+
+  /**
+   * Get constraints with sensible default bounds.
+   * Override in derived classes for specific default values.
+   */
+  getDefaultConstraints(): Constraints {
+    const defaults = new Constraints(this.calculator.getInstrument().lengthType);
+    defaults.setNumberOfHoles(this.calculator.getInstrument().hole?.length ?? 0);
+    defaults.setObjectiveFunctionName(this.getObjectiveFunctionName());
+    defaults.setObjectiveDisplayName(this.getDisplayName());
+    // Default implementation uses current constraints
+    // Derived classes should override with sensible defaults
+    for (const constraint of this.constraints.getConstraints()) {
+      defaults.addConstraint({ ...constraint });
+    }
+    defaults.setLowerBounds(this.constraints.getLowerBounds());
+    defaults.setUpperBounds(this.constraints.getUpperBounds());
+    return defaults;
+  }
+
+  /**
+   * Get constraints with unlimited (blank) bounds.
+   * Lower bounds set to minimum safe value, upper bounds to maximum safe value.
+   */
+  getBlankConstraints(): Constraints {
+    const blank = new Constraints(this.calculator.getInstrument().lengthType);
+    blank.setNumberOfHoles(this.calculator.getInstrument().hole?.length ?? 0);
+    blank.setObjectiveFunctionName(this.getObjectiveFunctionName());
+    blank.setObjectiveDisplayName(this.getDisplayName());
+
+    const MIN_BOUND = -1.0e10;
+    const MAX_BOUND = 1.0e10;
+    const lowerBounds: number[] = [];
+    const upperBounds: number[] = [];
+
+    for (const constraint of this.constraints.getConstraints()) {
+      blank.addConstraint({
+        ...constraint,
+        lowerBound: constraint.type === ConstraintType.DIMENSIONAL ? 0 : MIN_BOUND,
+        upperBound: MAX_BOUND,
+      });
+      // Dimensional values should have 0 as minimum (lengths can't be negative)
+      lowerBounds.push(constraint.type === ConstraintType.DIMENSIONAL ? 0 : MIN_BOUND);
+      upperBounds.push(MAX_BOUND);
+    }
+
+    blank.setLowerBounds(lowerBounds);
+    blank.setUpperBounds(upperBounds);
+    return blank;
+  }
+
+  /**
+   * Get the display name for this objective function.
+   * Override in derived classes for human-readable name.
+   */
+  getDisplayName(): string {
+    return this.getObjectiveFunctionName();
+  }
+
+  /**
+   * Get the class/function name identifier.
+   * Override in derived classes to return the specific function name.
+   */
+  getObjectiveFunctionName(): string {
+    return "BaseObjectiveFunction";
   }
 
   getNumberOfEvaluations(): number {
