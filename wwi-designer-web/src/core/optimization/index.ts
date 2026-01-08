@@ -129,3 +129,13 @@ export {
   getObjectiveFunctionNames,
   OBJECTIVE_FUNCTION_INFO,
 } from "./objective-function-factory.ts";
+
+// Range processors for multi-start optimization
+export {
+  type RandomVectorGenerator,
+  AbstractRangeProcessor,
+  RandomRangeProcessor,
+  GridRangeProcessor,
+  LatinHypercubeRangeProcessor,
+  createRangeProcessor,
+} from "./range-processor.ts";

@@ -20,6 +20,7 @@ import {
   BaseObjectiveFunction,
   OptimizerType,
 } from "./base-objective-function.ts";
+import { RandomRangeProcessor } from "./range-processor.ts";
 
 /**
  * Result of an optimization run with additional statistics.
@@ -59,6 +60,21 @@ export interface OptimizerOptions {
   twoStage?: boolean;
   /** Callback for progress updates */
   onProgress?: (message: string, progress?: number) => void;
+  /** Number of multi-start runs (0 or undefined = single start) */
+  numberOfStarts?: number;
+  /** Multi-start strategy: "random", "grid", or "lhs" */
+  multiStartStrategy?: "random" | "grid" | "lhs";
+  /** Indices of dimensions to vary in multi-start (null = all) */
+  indicesToVary?: number[] | null;
+}
+
+/**
+ * Result from a single optimization start.
+ */
+interface SingleStartResult {
+  point: number[];
+  value: number;
+  evaluations: number;
 }
 
 /**
@@ -212,6 +228,175 @@ function runLocalOptimization(
 }
 
 /**
+ * Run a single optimization start from a given starting point.
+ */
+function doSingleStart(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): SingleStartResult {
+  const optimizerType = objective.getOptimizerType();
+
+  let result: OptimizationResult;
+
+  if (optimizerType === OptimizerType.DIRECT) {
+    // Two-stage: DIRECT for global, then BOBYQA for local refinement
+    const directResult = runDirect(objective, startPoint, {
+      ...options,
+      maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
+    });
+
+    const bobyqaResult = runBobyqa(objective, directResult.point, {
+      ...options,
+      maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
+    });
+
+    result = bobyqaResult.value < directResult.value ? bobyqaResult : directResult;
+  } else if (optimizerType === OptimizerType.BOBYQA) {
+    result = runBobyqa(objective, startPoint, options);
+  } else if (optimizerType === OptimizerType.BRENT) {
+    result = runLocalOptimization(objective, startPoint, options);
+  } else {
+    result = runLocalOptimization(objective, startPoint, options);
+  }
+
+  return {
+    point: result.point,
+    value: result.value,
+    evaluations: result.evaluations,
+  };
+}
+
+/**
+ * Run multi-start optimization.
+ *
+ * Runs the optimizer from multiple starting points and returns the best result.
+ * This helps escape local minima and find better global solutions.
+ */
+function multiStartOptimize(
+  objective: BaseObjectiveFunction,
+  startPoint: number[],
+  options: OptimizerOptions
+): SingleStartResult {
+  const onProgress = options.onProgress ?? (() => {});
+
+  // Get or create range processor
+  let rangeProcessor = objective.getRangeProcessor();
+  const numberOfStarts = options.numberOfStarts ?? rangeProcessor?.getNumberOfStarts() ?? 30;
+
+  if (rangeProcessor === null) {
+    // Create default random range processor
+    rangeProcessor = new RandomRangeProcessor(
+      objective.getLowerBounds(),
+      objective.getUpperBounds(),
+      options.indicesToVary ?? null,
+      numberOfStarts
+    );
+  }
+
+  // Set static values for non-varying dimensions
+  rangeProcessor.setStaticValues(startPoint);
+
+  // Store results from each start
+  const results: (SingleStartResult | null)[] = new Array(numberOfStarts).fill(null);
+
+  // Calculate evaluations per start
+  const totalMaxEvals = options.maxEvaluations ?? objective.getMaxEvaluations() * numberOfStarts;
+  const evalsPerStart = Math.floor(totalMaxEvals / numberOfStarts);
+
+  // Save original evaluator for two-stage optimization
+  const originalEvaluator = objective.getEvaluator();
+  const firstStageEvaluator = objective.getFirstStageEvaluator();
+  const runTwoStage = objective.isRunTwoStageOptimization() && firstStageEvaluator !== null;
+
+  // Use first-stage evaluator for multi-start phase if two-stage is enabled
+  if (runTwoStage && firstStageEvaluator) {
+    objective.setEvaluator(firstStageEvaluator);
+  }
+
+  let totalEvaluations = 0;
+  let nextStart = [...startPoint];
+
+  // Multi-start loop
+  for (let startNr = 0; startNr < numberOfStarts; startNr++) {
+    if (totalEvaluations >= totalMaxEvals) {
+      break;
+    }
+
+    onProgress(`Start ${startNr + 1}/${numberOfStarts}...`, startNr / numberOfStarts);
+
+    try {
+      const result = doSingleStart(objective, nextStart, {
+        ...options,
+        maxEvaluations: Math.min(evalsPerStart, totalMaxEvals - totalEvaluations),
+      });
+
+      results[startNr] = result;
+      totalEvaluations += result.evaluations;
+
+      onProgress(
+        `Start ${startNr + 1}: optimum ${result.value.toFixed(4)} (${result.evaluations} evals)`,
+        (startNr + 1) / numberOfStarts
+      );
+    } catch (e) {
+      // Failed start - continue with others
+      onProgress(`Start ${startNr + 1}: failed - ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // Generate next starting point
+    nextStart = rangeProcessor.nextVector();
+  }
+
+  // Sort results (best to worst), with nulls at end
+  const validResults = results.filter((r): r is SingleStartResult => r !== null);
+  validResults.sort((a, b) => a.value - b.value);
+
+  if (validResults.length === 0) {
+    // All starts failed - return initial point
+    return {
+      point: startPoint,
+      value: objective.value(startPoint),
+      evaluations: totalEvaluations,
+    };
+  }
+
+  // Get best result
+  let bestResult = validResults[0];
+
+  // Final refinement with original evaluator if two-stage is enabled
+  if (runTwoStage) {
+    objective.setEvaluator(originalEvaluator);
+
+    onProgress("Final refinement with full evaluator...");
+
+    try {
+      const refinedResult = doSingleStart(objective, bestResult.point, {
+        ...options,
+        maxEvaluations: Math.floor(evalsPerStart / 2),
+      });
+
+      if (refinedResult.value < bestResult.value) {
+        bestResult = refinedResult;
+        onProgress(`Refined to ${bestResult.value.toFixed(4)}`);
+      }
+    } catch (e) {
+      // Refinement failed - use best multi-start result
+      onProgress(`Refinement failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  onProgress(
+    `Multi-start complete: best ${bestResult.value.toFixed(4)} from ${validResults.length} successful starts`
+  );
+
+  return {
+    point: bestResult.point,
+    value: bestResult.value,
+    evaluations: totalEvaluations,
+  };
+}
+
+/**
  * Run optimization on an objective function.
  */
 export function optimizeObjectiveFunction(
@@ -249,58 +434,78 @@ export function optimizeObjectiveFunction(
     onProgress(formatErrors("Initial error: ", initialNorm));
 
     let finalPoint: number[];
-    const optimizerType = objective.getOptimizerType();
 
-    if (optimizerType === OptimizerType.DIRECT) {
-      // Two-stage: DIRECT for global, then BOBYQA for local refinement
-      onProgress("Running global optimization (DIRECT)...");
+    // Check if multi-start optimization is enabled
+    const useMultiStart =
+      objective.isMultiStart() ||
+      (options.numberOfStarts !== undefined && options.numberOfStarts > 1);
 
-      const directResult = runDirect(objective, startPoint, {
-        ...options,
-        maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
-      });
+    if (useMultiStart) {
+      // Run multi-start optimization
+      const numberOfStarts = options.numberOfStarts ?? objective.getRangeProcessor()?.getNumberOfStarts() ?? 30;
+      onProgress(`Running multi-start optimization (${numberOfStarts} starts)...`);
+
+      const multiStartResult = multiStartOptimize(objective, startPoint, options);
+      finalPoint = multiStartResult.point;
 
       onProgress(
-        `After ${directResult.evaluations} evaluations, global optimizer found optimum ${directResult.value.toFixed(4)}`
+        `Multi-start found optimum ${multiStartResult.value.toFixed(4)} in ${multiStartResult.evaluations} total evaluations`
       );
-
-      // Refine with BOBYQA (matching Java's two-stage pipeline)
-      onProgress("Refining with BOBYQA...");
-      const bobyqaResult = runBobyqa(objective, directResult.point, {
-        ...options,
-        maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
-      });
-
-      if (bobyqaResult.value < directResult.value) {
-        finalPoint = bobyqaResult.point;
-        onProgress(
-          `BOBYQA refined to ${bobyqaResult.value.toFixed(4)} in ${bobyqaResult.evaluations} evaluations`
-        );
-      } else {
-        finalPoint = directResult.point;
-        onProgress(
-          `BOBYQA did not improve (${bobyqaResult.value.toFixed(4)})`
-        );
-      }
-    } else if (optimizerType === OptimizerType.BOBYQA) {
-      // Use BOBYQA directly for local optimization
-      onProgress("Running optimization (BOBYQA)...");
-      const result = runBobyqa(objective, startPoint, options);
-      finalPoint = result.point;
-      onProgress(
-        `BOBYQA found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
-      );
-    } else if (optimizerType === OptimizerType.BRENT) {
-      // Univariate optimization - use coordinate descent for now
-      // TODO: Implement proper Brent optimizer for 1D
-      onProgress("Running optimization (univariate)...");
-      const result = runLocalOptimization(objective, startPoint, options);
-      finalPoint = result.point;
     } else {
-      // Fallback to coordinate descent for unimplemented optimizer types
-      onProgress(`Running optimization (fallback for ${optimizerType})...`);
-      const result = runLocalOptimization(objective, startPoint, options);
-      finalPoint = result.point;
+      // Single-start optimization
+      const optimizerType = objective.getOptimizerType();
+
+      if (optimizerType === OptimizerType.DIRECT) {
+        // Two-stage: DIRECT for global, then BOBYQA for local refinement
+        onProgress("Running global optimization (DIRECT)...");
+
+        const directResult = runDirect(objective, startPoint, {
+          ...options,
+          maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
+        });
+
+        onProgress(
+          `After ${directResult.evaluations} evaluations, global optimizer found optimum ${directResult.value.toFixed(4)}`
+        );
+
+        // Refine with BOBYQA (matching Java's two-stage pipeline)
+        onProgress("Refining with BOBYQA...");
+        const bobyqaResult = runBobyqa(objective, directResult.point, {
+          ...options,
+          maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
+        });
+
+        if (bobyqaResult.value < directResult.value) {
+          finalPoint = bobyqaResult.point;
+          onProgress(
+            `BOBYQA refined to ${bobyqaResult.value.toFixed(4)} in ${bobyqaResult.evaluations} evaluations`
+          );
+        } else {
+          finalPoint = directResult.point;
+          onProgress(
+            `BOBYQA did not improve (${bobyqaResult.value.toFixed(4)})`
+          );
+        }
+      } else if (optimizerType === OptimizerType.BOBYQA) {
+        // Use BOBYQA directly for local optimization
+        onProgress("Running optimization (BOBYQA)...");
+        const result = runBobyqa(objective, startPoint, options);
+        finalPoint = result.point;
+        onProgress(
+          `BOBYQA found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+        );
+      } else if (optimizerType === OptimizerType.BRENT) {
+        // Univariate optimization - use coordinate descent for now
+        // TODO: Implement proper Brent optimizer for 1D
+        onProgress("Running optimization (univariate)...");
+        const result = runLocalOptimization(objective, startPoint, options);
+        finalPoint = result.point;
+      } else {
+        // Fallback to coordinate descent for unimplemented optimizer types
+        onProgress(`Running optimization (fallback for ${optimizerType})...`);
+        const result = runLocalOptimization(objective, startPoint, options);
+        finalPoint = result.point;
+      }
     }
 
     // Apply final geometry and compute final error

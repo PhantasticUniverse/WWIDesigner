@@ -20,6 +20,7 @@ import type { Instrument } from "../../models/instrument.ts";
 import type { IInstrumentCalculator } from "../modelling/instrument-calculator.ts";
 import type { IEvaluator } from "./evaluator.ts";
 import { Constraints, ConstraintType, createConstraint } from "./constraints.ts";
+import type { AbstractRangeProcessor } from "./range-processor.ts";
 
 /**
  * Optimizer types supported.
@@ -54,6 +55,9 @@ export abstract class BaseObjectiveFunction {
   protected initialTrustRegionRadius: number | null = null;
   protected runTwoStageOptimization: boolean = false;
   protected cancelled: boolean = false;
+
+  // Multi-start settings
+  protected rangeProcessor: AbstractRangeProcessor | null = null;
 
   // Statistics
   protected tuningsDone: number = 0;
@@ -377,5 +381,31 @@ export abstract class BaseObjectiveFunction {
   resetStatistics(): void {
     this.evaluationsDone = 0;
     this.tuningsDone = 0;
+  }
+
+  // Multi-start support
+
+  /**
+   * Check if multi-start optimization is enabled.
+   */
+  isMultiStart(): boolean {
+    return this.rangeProcessor !== null;
+  }
+
+  /**
+   * Get the range processor for multi-start optimization.
+   */
+  getRangeProcessor(): AbstractRangeProcessor | null {
+    return this.rangeProcessor;
+  }
+
+  /**
+   * Set the range processor for multi-start optimization.
+   *
+   * Setting a range processor enables multi-start optimization.
+   * Set to null to disable multi-start.
+   */
+  setRangeProcessor(processor: AbstractRangeProcessor | null): void {
+    this.rangeProcessor = processor;
   }
 }
