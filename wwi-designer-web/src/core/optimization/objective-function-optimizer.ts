@@ -440,6 +440,11 @@ function doSingleStart(
  *
  * Runs the optimizer from multiple starting points and returns the best result.
  * This helps escape local minima and find better global solutions.
+ *
+ * When forceDirectOptimizer is set, follows Java's pattern:
+ * 1. Run DIRECT once to find global region
+ * 2. Refine with BOBYQA
+ * 3. Then run multiple random BOBYQA starts (NOT multiple DIRECT runs)
  */
 function multiStartOptimize(
   objective: BaseObjectiveFunction,
@@ -470,22 +475,65 @@ function multiStartOptimize(
 
   // Calculate evaluations per start
   const totalMaxEvals = options.maxEvaluations ?? objective.getMaxEvaluations() * numberOfStarts;
-  const evalsPerStart = Math.floor(totalMaxEvals / numberOfStarts);
 
   // Save original evaluator for two-stage optimization
   const originalEvaluator = objective.getEvaluator();
   const firstStageEvaluator = objective.getFirstStageEvaluator();
   const runTwoStage = objective.isRunTwoStageOptimization() && firstStageEvaluator !== null;
 
+  let totalEvaluations = 0;
+  let refinedStartPoint = [...startPoint];
+
+  // If forceDirectOptimizer is set, run DIRECT once first to find global region
+  // This matches Java's behavior: DIRECT → BOBYQA refine → multi-start BOBYQA
+  if (options.forceDirectOptimizer) {
+    // Use first-stage evaluator for DIRECT if two-stage is enabled
+    if (runTwoStage && firstStageEvaluator) {
+      objective.setEvaluator(firstStageEvaluator);
+    }
+
+    onProgress("Running DIRECT global optimizer...");
+    const directResult = runDirect(objective, startPoint, {
+      ...options,
+      maxEvaluations: Math.floor(totalMaxEvals / 4), // Use 25% of budget for DIRECT
+    });
+    totalEvaluations += directResult.evaluations;
+    onProgress(`After global optimizer, error: ${directResult.value.toFixed(4)}`);
+
+    // Refine with BOBYQA
+    const bobyqaResult = runBobyqa(objective, directResult.point, {
+      ...options,
+      maxEvaluations: Math.floor(totalMaxEvals / 8), // Use 12.5% for refinement
+      forceDirectOptimizer: false, // Don't use DIRECT for refinement
+    });
+    totalEvaluations += bobyqaResult.evaluations;
+    refinedStartPoint = bobyqaResult.value < directResult.value ? bobyqaResult.point : directResult.point;
+    onProgress(`Refined start, error: ${Math.min(bobyqaResult.value, directResult.value).toFixed(4)}`);
+
+    // Restore original evaluator for multi-start phase
+    if (runTwoStage) {
+      objective.setEvaluator(originalEvaluator);
+    }
+  }
+
   // Use first-stage evaluator for multi-start phase if two-stage is enabled
   if (runTwoStage && firstStageEvaluator) {
     objective.setEvaluator(firstStageEvaluator);
   }
 
-  let totalEvaluations = 0;
-  let nextStart = [...startPoint];
+  // Calculate remaining evaluations per start
+  const remainingEvals = totalMaxEvals - totalEvaluations;
+  const evalsPerStart = Math.floor(remainingEvals / numberOfStarts);
 
-  // Multi-start loop
+  let nextStart = [...refinedStartPoint];
+
+  // Multi-start loop - always uses BOBYQA (not DIRECT) for each start
+  // This matches Java's optimizeMultiStart() behavior
+  const multiStartOptions = {
+    ...options,
+    forceDirectOptimizer: false, // Never use DIRECT in multi-start loop
+  };
+
   for (let startNr = 0; startNr < numberOfStarts; startNr++) {
     if (totalEvaluations >= totalMaxEvals) {
       break;
@@ -495,7 +543,7 @@ function multiStartOptimize(
 
     try {
       const result = doSingleStart(objective, nextStart, {
-        ...options,
+        ...multiStartOptions,
         maxEvaluations: Math.min(evalsPerStart, totalMaxEvals - totalEvaluations),
       });
 
@@ -539,7 +587,7 @@ function multiStartOptimize(
 
     try {
       const refinedResult = doSingleStart(objective, bestResult.point, {
-        ...options,
+        ...multiStartOptions,
         maxEvaluations: Math.floor(evalsPerStart / 2),
       });
 
