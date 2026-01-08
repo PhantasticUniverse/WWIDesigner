@@ -15,6 +15,8 @@ interface AppState {
   tunings: Map<string, Tuning>;
   selectedInstrument: string | null;
   selectedTuning: string | null;
+  selectedOptimizer: string;
+  selectedMultistart: string;
   preferences: {
     temperature: number;
     humidity: number;
@@ -29,6 +31,8 @@ const state: AppState = {
   tunings: new Map(),
   selectedInstrument: null,
   selectedTuning: null,
+  selectedOptimizer: "HolePositionObjectiveFunction",
+  selectedMultistart: "none",
   preferences: {
     temperature: 20,
     humidity: 45,
@@ -1231,13 +1235,13 @@ function updateSidebar() {
     });
   }
 
-  // Expand sections that have items
+  // Expand sections that have items (instruments/tunings only)
   $$(".tree-header").forEach((header) => {
     const category = (header as HTMLElement).dataset.category;
-    const hasItems =
-      (category === "instruments" && state.instruments.size > 0) ||
-      (category === "tunings" && state.tunings.size > 0);
-    if (hasItems) {
+    if (category === "instruments" && state.instruments.size > 0) {
+      header.classList.add("expanded");
+    }
+    if (category === "tunings" && state.tunings.size > 0) {
       header.classList.add("expanded");
     }
   });
@@ -1639,6 +1643,26 @@ function init() {
   $$(".tree-header").forEach((header) => {
     header.addEventListener("click", () => {
       header.classList.toggle("expanded");
+    });
+  });
+
+  // Optimizer selection
+  $$("#optimizer-list li").forEach((li) => {
+    li.addEventListener("click", () => {
+      $$("#optimizer-list li").forEach((item) => item.classList.remove("selected"));
+      li.classList.add("selected");
+      state.selectedOptimizer = (li as HTMLElement).dataset.value || "HolePositionObjectiveFunction";
+      log(`Selected optimizer: ${li.textContent}`, "info");
+    });
+  });
+
+  // Multi-start optimization selection
+  $$("#multistart-list li").forEach((li) => {
+    li.addEventListener("click", () => {
+      $$("#multistart-list li").forEach((item) => item.classList.remove("selected"));
+      li.classList.add("selected");
+      state.selectedMultistart = (li as HTMLElement).dataset.value || "none";
+      log(`Multi-start: ${li.textContent}`, "info");
     });
   });
 

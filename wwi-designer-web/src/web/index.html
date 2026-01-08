@@ -99,16 +99,42 @@
           <div class="tree-section">
             <div class="tree-header" data-category="instruments">
               <span class="tree-toggle">&#9654;</span>
-              <span>Instruments</span>
+              <span>Instrument</span>
             </div>
             <ul class="tree-list" id="instruments-list"></ul>
           </div>
           <div class="tree-section">
             <div class="tree-header" data-category="tunings">
               <span class="tree-toggle">&#9654;</span>
-              <span>Tunings</span>
+              <span>Tuning</span>
             </div>
             <ul class="tree-list" id="tunings-list"></ul>
+          </div>
+          <div class="tree-section">
+            <div class="tree-header expanded" data-category="multistart">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Multi-start optimization</span>
+            </div>
+            <ul class="tree-list" id="multistart-list">
+              <li class="selected" data-value="none">No multi-start optimization</li>
+              <li data-value="bore-length">Vary bore length</li>
+            </ul>
+          </div>
+          <div class="tree-section">
+            <div class="tree-header expanded" data-category="optimizer">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Optimizer</span>
+            </div>
+            <ul class="tree-list" id="optimizer-list">
+              <li data-value="FippleFactorObjectiveFunction">Fipple factor</li>
+              <li data-value="GroupedHolePositionObjectiveFunction">Grouped-hole position & size</li>
+              <li class="selected" data-value="HolePositionObjectiveFunction">Hole size & position</li>
+              <li data-value="HoleSizeObjectiveFunction">Hole size only</li>
+              <li data-value="SingleTaperGroupedHoleObjectiveFunction">Single taper, grouped hole</li>
+              <li data-value="SingleTaperHemiHeadGroupedHoleObjectiveFunction">Single taper, hemi-head, grouped hole</li>
+              <li data-value="SingleTaperHemiHeadNoHoleGroupingObjectiveFunction">Single taper, hemi-head, no hole grouping</li>
+              <li data-value="SingleTaperNoHoleGroupingObjectiveFunction">Single taper, no hole grouping</li>
+            </ul>
           </div>
           <div class="tree-section">
             <div class="tree-header" data-category="constraints">
