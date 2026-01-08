@@ -1080,6 +1080,7 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, object
     return;
   }
 
+  const nrTargetNotes = tuning.fingering?.length || 0;
   log(`Optimizing with ${objectiveFunction}...`, "info");
 
   try {
@@ -1102,10 +1103,14 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, object
       return;
     }
 
-    log(
-      `Optimization complete (${data.dimensions} variables). Error: ${data.initialError.toFixed(2)} → ${data.finalError.toFixed(2)}`,
-      "success"
-    );
+    // Log detailed optimization results (matching Java format)
+    log(`System has ${data.dimensions} optimization variables and ${data.targetNotes || nrTargetNotes} target notes.`, "info");
+    log(`Initial error: ${data.initialError}`, "info");
+    log(`After ${data.evaluations} evaluations, optimizer found optimum ${data.finalError}`, "info");
+    log(`Final error:  ${data.finalError}`, "info");
+    log(`Residual error ratio: ${data.residualRatio?.toFixed(6) || (data.finalError / data.initialError).toFixed(6)}`, "info");
+    log(`Elapsed time: ${data.elapsedTime?.toFixed(1) || "N/A"} seconds.`, "info");
+    log(`Optimization complete!`, "success");
 
     // Create new instrument with optimized geometry
     const optimizedId = `optimized-${Date.now()}`;

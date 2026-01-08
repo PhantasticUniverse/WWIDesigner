@@ -142,12 +142,28 @@ async function handleOptimize(req: Request): Promise<Response> {
     // Create objective function using factory
     const objective = createObjectiveFunction(objectiveFunction, calc, tuning, evaluator);
 
-    console.log(`Optimizing with ${objectiveFunction}, ${objective.getNrDimensions()} variables`);
+    const nrDimensions = objective.getNrDimensions();
+    const nrTargetNotes = tuning.fingering?.length || 0;
+
+    // Log optimization start (matching Java format)
+    console.log(`System has ${nrDimensions} optimization variables and ${nrTargetNotes} target notes.`);
+
+    const startTime = performance.now();
 
     const result = optimizeObjectiveFunction(objective, {
       maxIterations: 1000,
       tolerance: 1e-6,
     });
+
+    const elapsedTime = (performance.now() - startTime) / 1000;
+    const residualRatio = result.initialNorm > 0 ? result.finalNorm / result.initialNorm : 0;
+
+    // Log optimization results (matching Java format)
+    console.log(`Initial error: ${result.initialNorm}`);
+    console.log(`After ${result.evaluations} evaluations, optimizer found optimum ${result.finalNorm}`);
+    console.log(`Final error:  ${result.finalNorm}`);
+    console.log(`Residual error ratio: ${residualRatio}`);
+    console.log(`Elapsed time: ${elapsedTime.toFixed(1)} seconds.`);
 
     return Response.json({
       optimizedInstrument: objective.getInstrument(),
@@ -156,7 +172,10 @@ async function handleOptimize(req: Request): Promise<Response> {
       evaluations: result.evaluations,
       success: result.success,
       objectiveFunction: objectiveFunction,
-      dimensions: objective.getNrDimensions(),
+      dimensions: nrDimensions,
+      targetNotes: nrTargetNotes,
+      residualRatio: residualRatio,
+      elapsedTime: elapsedTime,
     });
   } catch (error) {
     console.error("Optimize error:", error);

@@ -149,10 +149,17 @@ beforeAll(async () => {
     const evaluator = new CentDeviationEvaluator(calc);
     const objective = createObjectiveFunction(objectiveFunction, calc, tuning, evaluator);
 
+    const nrDimensions = objective.getNrDimensions();
+    const nrTargetNotes = tuning.fingering?.length || 0;
+    const startTime = performance.now();
+
     const result = optimizeObjectiveFunction(objective, {
       maxIterations: 100, // Reduced for tests
       tolerance: 1e-4,
     });
+
+    const elapsedTime = (performance.now() - startTime) / 1000;
+    const residualRatio = result.initialNorm > 0 ? result.finalNorm / result.initialNorm : 0;
 
     return Response.json({
       optimizedInstrument: objective.getInstrument(),
@@ -161,7 +168,10 @@ beforeAll(async () => {
       evaluations: result.evaluations,
       success: result.success,
       objectiveFunction: objectiveFunction,
-      dimensions: objective.getNrDimensions(),
+      dimensions: nrDimensions,
+      targetNotes: nrTargetNotes,
+      residualRatio: residualRatio,
+      elapsedTime: elapsedTime,
     });
   }
 
@@ -349,11 +359,20 @@ describe("Optimize API", () => {
     expect(data.objectiveFunction).toBe("HolePositionObjectiveFunction");
     expect(typeof data.dimensions).toBe("number");
 
+    // Verify new fields for detailed console output
+    expect(typeof data.targetNotes).toBe("number");
+    expect(typeof data.residualRatio).toBe("number");
+    expect(typeof data.elapsedTime).toBe("number");
+
     // Verify values are sensible
     expect(data.initialError).toBeGreaterThanOrEqual(0);
     expect(data.finalError).toBeGreaterThanOrEqual(0);
     expect(data.evaluations).toBeGreaterThan(0);
     expect(data.dimensions).toBeGreaterThan(0);
+    expect(data.targetNotes).toBeGreaterThan(0);
+    expect(data.residualRatio).toBeGreaterThanOrEqual(0);
+    expect(data.residualRatio).toBeLessThanOrEqual(1); // Final should be <= initial
+    expect(data.elapsedTime).toBeGreaterThanOrEqual(0);
   });
 
   test("returns error for unknown objective function", async () => {
