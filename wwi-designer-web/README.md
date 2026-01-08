@@ -93,9 +93,9 @@ const objective = createObjectiveFunction(
   evaluator
 );
 
-// Optimize
-const result = optimizeObjectiveFunction(objective, { maxIterations: 1000 });
-console.log(`Error: ${result.initialValue} → ${result.finalValue}`);
+// Optimize (uses objective function's default maxEvaluations)
+const result = optimizeObjectiveFunction(objective);
+console.log(`Error: ${result.initialNorm} → ${result.finalNorm}`);
 ```
 
 ## Usage Example
