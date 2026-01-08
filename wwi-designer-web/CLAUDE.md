@@ -94,9 +94,14 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **696 total tests**, all passing ✅
+- **772 total tests**, all passing ✅
+- **355 optimization tests** covering all algorithms and objective functions
 - **68+ parity tests** specifically for Java comparison
 - **20 BOBYQA optimizer tests** for convergence and bounds handling
+- **24 Brent optimizer tests** for univariate optimization
+- **16 CMA-ES optimizer tests** for evolutionary optimization
+- **18 Simplex optimizer tests** for Nelder-Mead method
+- **18 Powell optimizer tests** for conjugate direction method
 - **15 multi-start optimization tests**
 - **11 two-stage evaluator tests**
 - Tests use actual NAF sample instrument files and Java example files
@@ -110,7 +115,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
 - [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
 - [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
-- [x] Phase 6: Optimization (DIRECT + BOBYQA algorithms, 7 evaluators, 52 objective functions)
+- [x] Phase 6: Optimization (6 algorithms: DIRECT, BOBYQA, Brent, CMA-ES, Simplex, Powell; 7 evaluators; 51 objective functions)
 - [x] Phase 7: Web UI (Bun.serve, instrument/tuning editors, visualization, optimization)
 
 ### Recently Completed Features
@@ -205,9 +210,14 @@ Still needed (2 remaining):
 - [ ] FluteStudyModel - Transverse flute workflows
 - [ ] ReedStudyModel - Reed instrument workflows
 
-#### Phase 14: Additional Optimization Features
-- [ ] Hole grouping constraints (linked hole sizes)
+#### Phase 14: Additional Optimization Features ✅ COMPLETE
 - [x] Multi-start optimization (RandomRangeProcessor, GridRangeProcessor, LatinHypercubeRangeProcessor)
+- [x] Two-stage evaluator optimization
+- [x] Brent univariate optimizer
+- [x] CMA-ES evolutionary optimizer
+- [x] Simplex (Nelder-Mead) optimizer
+- [x] Powell conjugate direction optimizer
+- [ ] Hole grouping constraints (linked hole sizes)
 - [ ] Constraint validation/reporting
 
 ## Feature Gap Analysis
@@ -222,7 +232,8 @@ Still needed (2 remaining):
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
 | Evaluators | 8 | 7 | 88% |
-| Objective Functions | 54 | 52 | 96% |
+| Objective Functions | 54 | 51 | 94% |
+| Optimization Algorithms | 6 | 6 | 100% |
 | Tuners | 5 | 5 | 100% |
 | Spectrum Analyzers | 3 | 3 | 100% |
 | Study Models | 4 | 0 | 0% |

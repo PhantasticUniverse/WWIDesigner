@@ -41,7 +41,7 @@ The web interface is available at http://localhost:3000
 | [Tone Holes](docs/TONE-HOLES.md) | Hole acoustic model (Lefebvre-Scavone 2012) |
 | [Mouthpieces](docs/MOUTHPIECES.md) | Fipple, embouchure, and reed models |
 | [Termination](docs/TERMINATION.md) | Radiation impedance (Silva 2008) |
-| [Optimization](docs/OPTIMIZATION.md) | DIRECT + BOBYQA algorithms for hole optimization |
+| [Optimization](docs/OPTIMIZATION.md) | DIRECT, BOBYQA, Brent, CMA-ES, Simplex, Powell algorithms |
 
 ### Developer Notes
 
@@ -57,7 +57,20 @@ See [CLAUDE.md](CLAUDE.md) for development guidelines, testing status, and Bun c
 
 ## Optimization
 
-The optimizer supports **48 objective functions** for different optimization goals:
+The optimizer supports **51 objective functions** and **6 optimization algorithms**:
+
+### Algorithms
+
+| Algorithm | Type | Use Case |
+|-----------|------|----------|
+| **DIRECT** | Global | Broad search, escaping local minima |
+| **BOBYQA** | Local | Refinement near optimum |
+| **Brent** | Univariate | Single-variable optimization |
+| **CMA-ES** | Evolutionary | Population-based multivariate |
+| **Simplex** | Derivative-free | Nelder-Mead method |
+| **Powell** | Direction-based | Conjugate direction search |
+
+### Objective Function Categories
 
 | Category | Examples |
 |----------|----------|
@@ -143,7 +156,7 @@ bun test tests/parity/
 bun test tests/core/physical-parameters.test.ts
 ```
 
-**Test Summary**: 696 tests, including 68+ parity tests against Java output.
+**Test Summary**: 772 tests, including 68+ parity tests against Java output.
 
 ## References
 
@@ -152,6 +165,9 @@ bun test tests/core/physical-parameters.test.ts
 - Lefebvre, A., & Scavone, G. (2012). "Characterization of woodwind instrument toneholes"
 - CIPM-2007: Air property calculations from Committee on Data for Science and Technology
 - Jones, D. R., et al. (1993). "DIRECT optimization algorithm"
+- Powell, M.J.D. (2009). "BOBYQA algorithm"
+- Brent, R.P. (1973). "Algorithms for Minimization without Derivatives"
+- Hansen, N. (2016). "The CMA Evolution Strategy"
 
 ## License
 

@@ -161,12 +161,17 @@ src/
 │   └── optimization/
 │       ├── direct-optimizer.ts       # DIRECT global optimizer
 │       ├── bobyqa-optimizer.ts       # BOBYQA local optimizer
+│       ├── brent-optimizer.ts        # Brent univariate optimizer
+│       ├── cmaes-optimizer.ts        # CMA-ES evolutionary optimizer
+│       ├── simplex-optimizer.ts      # Nelder-Mead simplex optimizer
+│       ├── powell-optimizer.ts       # Powell conjugate direction optimizer
 │       ├── base-objective-function.ts # Base class for objectives
 │       ├── evaluator.ts              # Cent, Fmin, Fmax, Fminmax evaluators
 │       ├── constraints.ts            # Optimization constraints
-│       ├── hole-position-objective.ts # 52 objective functions (100% complete)
+│       ├── range-processor.ts        # Multi-start point generation
+│       ├── hole-position-objective.ts # 51 objective functions (100% complete)
 │       ├── objective-function-factory.ts # Factory for creating objectives by name
-│       └── objective-function-optimizer.ts # Two-stage optimizer orchestration
+│       └── objective-function-optimizer.ts # Multi-stage optimizer orchestration
 ├── models/
 │   ├── instrument.ts             # Instrument geometry model
 │   └── tuning.ts                 # Tuning/fingering model
@@ -181,9 +186,10 @@ This implementation achieves **exact parity** with Java WWIDesigner:
 
 - All acoustic calculations match to 15+ significant digits
 - NAF tuning predictions: 1.41 cents average deviation (identical to Java)
-- 696 tests, including 68+ parity tests against Java output
-- All 52 objective functions ported (100% complete)
-- Two-stage optimization pipeline (DIRECT → BOBYQA) matching Java
+- 772 tests, including 68+ parity tests against Java output
+- All 51 objective functions ported (100% complete)
+- Six optimization algorithms: DIRECT, BOBYQA, Brent, CMA-ES, Simplex, Powell
+- Multi-start and two-stage optimization pipelines matching Java
 
 Key Java classes and their TypeScript equivalents:
 
@@ -213,4 +219,4 @@ For detailed equations, see:
 4. [TONE-HOLES.md](./TONE-HOLES.md) - Hole acoustics
 5. [MOUTHPIECES.md](./MOUTHPIECES.md) - Excitation mechanisms
 6. [TERMINATION.md](./TERMINATION.md) - Radiation impedance
-7. [OPTIMIZATION.md](./OPTIMIZATION.md) - DIRECT + BOBYQA algorithms
+7. [OPTIMIZATION.md](./OPTIMIZATION.md) - All optimization algorithms (DIRECT, BOBYQA, Brent, CMA-ES, Simplex, Powell)
