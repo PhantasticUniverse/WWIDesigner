@@ -2294,6 +2294,9 @@ function init() {
       case "open-tuning":
         importTuningFile();
         break;
+      case "open-constraints":
+        importConstraintsFile();
+        break;
       case "preferences":
         showPreferencesModal();
         break;
