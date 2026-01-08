@@ -7,6 +7,8 @@
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import type { Server } from "bun";
+import { convertInstrumentFromMetres } from "../../src/models/instrument.ts";
+import type { LengthType } from "../../src/core/constants.ts";
 
 // Sample test data
 const SAMPLE_INSTRUMENT = {
@@ -144,6 +146,9 @@ beforeAll(async () => {
       return Response.json({ error: `Unknown objective function: ${objectiveFunction}` }, { status: 400 });
     }
 
+    // Store original length type for conversion after optimization
+    const originalLengthType: LengthType = instrument.lengthType || "MM";
+
     const params = new PhysicalParameters(temperature, "C", 101.325, humidity, 0.00039);
     const calc = createCalculator(instrument, params, calculatorType);
     const evaluator = new CentDeviationEvaluator(calc);
@@ -161,8 +166,14 @@ beforeAll(async () => {
     const elapsedTime = (performance.now() - startTime) / 1000;
     const residualRatio = result.initialNorm > 0 ? result.finalNorm / result.initialNorm : 0;
 
+    // Convert optimized instrument back to original length units
+    let optimizedInstrument = objective.getInstrument();
+    if (optimizedInstrument.lengthType === "M" && originalLengthType !== "M") {
+      optimizedInstrument = convertInstrumentFromMetres(optimizedInstrument, originalLengthType);
+    }
+
     return Response.json({
-      optimizedInstrument: objective.getInstrument(),
+      optimizedInstrument,
       initialError: result.initialNorm,
       finalError: result.finalNorm,
       evaluations: result.evaluations,
@@ -373,6 +384,40 @@ describe("Optimize API", () => {
     expect(data.residualRatio).toBeGreaterThanOrEqual(0);
     expect(data.residualRatio).toBeLessThanOrEqual(1); // Final should be <= initial
     expect(data.elapsedTime).toBeGreaterThanOrEqual(0);
+  });
+
+  test("preserves original length units after optimization", async () => {
+    const response = await fetch(`${baseUrl}/api/optimize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instrument: SAMPLE_INSTRUMENT, // lengthType: "MM"
+        tuning: SAMPLE_TUNING,
+        objectiveFunction: "HolePositionObjectiveFunction",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    // The optimized instrument should preserve the original length type
+    expect(data.optimizedInstrument.lengthType).toBe("MM");
+
+    // Bore positions should be in reasonable MM range (not meters)
+    const borePoints = data.optimizedInstrument.borePoint;
+    expect(borePoints.length).toBeGreaterThan(0);
+    for (const bp of borePoints) {
+      // MM values should be > 1 (meters would be < 1 for typical instruments)
+      expect(bp.borePosition).toBeGreaterThanOrEqual(0);
+      expect(bp.boreDiameter).toBeGreaterThan(1); // > 1mm
+    }
+
+    // Hole positions should also be in MM range
+    const holes = data.optimizedInstrument.hole;
+    for (const hole of holes) {
+      expect(hole.position).toBeGreaterThan(1); // > 1mm
+      expect(hole.diameter).toBeGreaterThan(1); // > 1mm
+    }
   });
 
   test("returns error for unknown objective function", async () => {

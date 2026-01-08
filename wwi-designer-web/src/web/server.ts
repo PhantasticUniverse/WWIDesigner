@@ -26,6 +26,8 @@ import {
   constraintsToJson,
 } from "../utils/xml-converter.ts";
 import type { Instrument } from "../models/instrument.ts";
+import { convertInstrumentFromMetres } from "../models/instrument.ts";
+import type { LengthType } from "../core/constants.ts";
 import type { Tuning, Fingering } from "../models/tuning.ts";
 
 // Store for active sessions
@@ -133,6 +135,9 @@ async function handleOptimize(req: Request): Promise<Response> {
       );
     }
 
+    // Store original length type for conversion after optimization
+    const originalLengthType: LengthType = instrument.lengthType || "MM";
+
     // PhysicalParameters(temp, tempType, pressure, humidity, xCO2)
     const params = new PhysicalParameters(temperature, "C", 101.325, humidity, 0.00039);
     // Use calculator factory with type detection or explicit type
@@ -165,8 +170,15 @@ async function handleOptimize(req: Request): Promise<Response> {
     console.log(`Residual error ratio: ${residualRatio}`);
     console.log(`Elapsed time: ${elapsedTime.toFixed(1)} seconds.`);
 
+    // Convert optimized instrument back to original length units
+    // The calculator internally converts to meters, so we need to convert back
+    let optimizedInstrument = objective.getInstrument();
+    if (optimizedInstrument.lengthType === "M" && originalLengthType !== "M") {
+      optimizedInstrument = convertInstrumentFromMetres(optimizedInstrument, originalLengthType);
+    }
+
     return Response.json({
-      optimizedInstrument: objective.getInstrument(),
+      optimizedInstrument,
       initialError: result.initialNorm,
       finalError: result.finalNorm,
       evaluations: result.evaluations,
