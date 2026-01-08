@@ -232,7 +232,7 @@ Still needed (2 remaining):
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
 | Evaluators | 8 | 7 | 88% |
-| Objective Functions | 54 | 51 | 94% |
+| Objective Functions | 51 | 51 | 100% |
 | Optimization Algorithms | 6 | 6 | 100% |
 | Tuners | 5 | 5 | 100% |
 | Spectrum Analyzers | 3 | 3 | 100% |

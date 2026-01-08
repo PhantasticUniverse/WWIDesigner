@@ -8,7 +8,7 @@ This document provides a comprehensive mapping between the original Java WWIDesi
 |-----------|------|------------|--------|
 | Acoustic Engine | 100% | 100% | **Exact** (15+ digit precision) |
 | Optimization Algorithms | 6 | 6 | **100%** |
-| Objective Functions | 54 | 51 | **94%** (all actively used) |
+| Objective Functions | 51 | 51 | **100%** |
 | Evaluators | 8 | 7 | **88%** |
 | Tuners | 5 | 5 | **100%** |
 | Spectrum Analyzers | 3 | 3 | **100%** |
