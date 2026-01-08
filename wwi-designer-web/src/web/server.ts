@@ -149,9 +149,9 @@ async function handleOptimize(req: Request): Promise<Response> {
 
     // Log air properties (matching Java format)
     console.log(`Properties of air at ${temperature.toFixed(2)} C, ${pressure.toFixed(3)} kPa, ${humidity}% humidity, ${co2Ppm} ppm CO2:`);
-    console.log(`Speed of sound is ${params.speedOfSound().toFixed(3)} m/s.`);
-    console.log(`Density is ${params.rho.toFixed(4)} kg/m^3.`);
-    console.log(`Epsilon factor is ${(params.alpha / Math.sqrt(params.speedOfSound())).toExponential(3)}.`);
+    console.log(`Speed of sound is ${params.getSpeedOfSound().toFixed(3)} m/s.`);
+    console.log(`Density is ${params.getRho().toFixed(4)} kg/m^3.`);
+    console.log(`Epsilon factor is ${(params.getAlphaConstant() / Math.sqrt(params.getSpeedOfSound())).toExponential(3)}.`);
 
     // Use calculator factory with type detection or explicit type
     const calc = createCalculator(instrument, params, calculatorType);
