@@ -94,8 +94,9 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **556 total tests**, all passing ✅
+- **670 total tests**, all passing ✅
 - **68+ parity tests** specifically for Java comparison
+- **20 BOBYQA optimizer tests** for convergence and bounds handling
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
 
@@ -107,7 +108,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - [x] Phase 3: Physics + Geometry (PhysicalParameters, Tube, BoreSectionCalculator)
 - [x] Phase 4: Component Calculators (holes, mouthpieces, terminations, instrument calculator)
 - [x] Phase 5: Playing Range + Tuner (Brent solver, resonance finding, tuning prediction)
-- [x] Phase 6: Optimization (DIRECT algorithm, 7 evaluators, 12 objective functions)
+- [x] Phase 6: Optimization (DIRECT + BOBYQA algorithms, 7 evaluators, 52 objective functions)
 - [x] Phase 7: Web UI (Bun.serve, instrument/tuning editors, visualization, optimization)
 
 ### Recently Completed Features
@@ -135,7 +136,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 
 ### Remaining Features (~35% Remaining)
 
-#### Phase 10: Objective Functions (28 of 55 implemented - 51%)
+#### Phase 10: Objective Functions (52 of 54 implemented - 96%) ✅ MOSTLY COMPLETE
 Already implemented:
 - [x] LengthObjectiveFunction - Simple bore length optimization
 - [x] HolePositionObjectiveFunction - Optimize hole positions from bottom
@@ -165,17 +166,35 @@ Already implemented:
 - [x] StopperPositionObjectiveFunction - Flute headjoint stopper position
 - [x] ConicalBoreObjectiveFunction - Conical bore foot diameter
 
-Still needed (27 remaining):
-- [ ] SingleTaperHoleGroupObjectiveFunction family (4+ variants)
-- [ ] GlobalHoleAndBoreLengthObjectiveFunction - Global hole + bore length
-- [ ] GlobalHoleObjectiveFunction - Global combined hole optimization
-- [ ] GlobalHolePositionObjectiveFunction - Global hole positions
-- [ ] GlobalHoleSizeObjectiveFunction - Global hole sizes
-- [ ] HoleAndBoreLengthObjectiveFunction - Holes + bore length
-- [ ] SingleTaperHoleGroupObjectiveFunction - Single taper + grouped holes
-- [ ] SingleTaperHoleObjectiveFunction - Single taper + holes
-- [ ] SingleTaperLengthObjectiveFunction - Single taper + length
-- [ ] Additional merged objective variants
+Additional implemented functions (Phase 10 completion):
+- [x] SingleTaperNoHoleGroupingObjectiveFunction - Single taper, no hole grouping
+- [x] SingleTaperNoHoleGroupingFromTopObjectiveFunction - From top variant
+- [x] SingleTaperHoleGroupObjectiveFunction - Single taper + grouped holes
+- [x] SingleTaperHoleGroupFromTopObjectiveFunction - From top variant
+- [x] GlobalHoleObjectiveFunction - Global combined hole optimization
+- [x] GlobalHolePositionObjectiveFunction - Global hole positions
+- [x] GlobalHoleAndTaperObjectiveFunction - Global holes + taper
+- [x] GlobalHoleAndBoreDiameterFromBottomObjectiveFunction - Global holes + bore
+- [x] GlobalHoleAndBoreDiameterFromTopObjectiveFunction - Global holes + bore from top
+- [x] GlobalBoreFromBottomObjectiveFunction - Global bore from bottom
+- [x] GlobalHoleAndBoreFromBottomObjectiveFunction - Global holes + bore
+- [x] HoleAndConicalBoreObjectiveFunction - Holes + conical bore
+- [x] HeadjointObjectiveFunction - Flute headjoint
+- [x] HoleAndHeadjointObjectiveFunction - Holes + headjoint
+- [x] BorePositionObjectiveFunction - Bore point positions
+- [x] BoreSpacingFromTopObjectiveFunction - Bore spacing from top
+- [x] BoreFromBottomObjectiveFunction - Bore from bottom
+- [x] HoleAndBoreFromBottomObjectiveFunction - Holes + bore from bottom
+- [x] HoleAndBorePositionObjectiveFunction - Holes + bore position
+- [x] HoleAndBoreSpacingFromTopObjectiveFunction - Holes + bore spacing
+- [x] SingleTaperSimpleRatioHemiHeadObjectiveFunction - Hemi-head taper
+- [x] SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction - Hemi-head no grouping
+- [x] SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction - Hemi-head grouped
+- [x] FluteCalibrationObjectiveFunction - Flute calibration
+- [x] WhistleCalibrationObjectiveFunction - Whistle calibration
+
+Still needed (2 remaining):
+- [ ] Additional specialized variants as needed
 
 #### Phase 12: Study Framework
 - [ ] BaseStudyModel abstraction
@@ -201,7 +220,7 @@ Still needed (27 remaining):
 | Termination Calculators | 5 | 5 | 100% |
 | Instrument Calculators | 3 | 2 | 67% |
 | Evaluators | 8 | 7 | 88% |
-| Objective Functions | 55 | 28 | 51% |
+| Objective Functions | 54 | 52 | 96% |
 | Tuners | 5 | 5 | 100% |
 | Spectrum Analyzers | 3 | 3 | 100% |
 | Study Models | 4 | 0 | 0% |

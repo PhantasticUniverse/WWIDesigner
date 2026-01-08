@@ -1,13 +1,19 @@
-# Optimization - DIRECT Algorithm
+# Optimization - DIRECT and BOBYQA Algorithms
 
 This document details the optimization system used to find optimal hole positions and sizes for wind instruments.
 
 ## Overview
 
-The optimization system uses the **DIRECT (DIviding RECTangles)** algorithm, a global optimization method that doesn't require derivatives. This is well-suited for instrument optimization where:
+The optimization system uses a **two-stage approach** combining global and local optimizers:
+
+1. **DIRECT (DIviding RECTangles)** - Global optimizer for broad exploration
+2. **BOBYQA (Bound Optimization BY Quadratic Approximation)** - Local optimizer for refinement
+
+This combination is well-suited for instrument optimization where:
 - The objective function is expensive to compute
 - The search space has multiple local minima
 - Gradients are not readily available
+- High precision is required in the final solution
 
 ## DIRECT Algorithm
 
@@ -807,6 +813,94 @@ Optimizer (sidebar)
 ├─ Single taper, hemi-head, no hole grouping
 └─ Single taper, no hole grouping
 ```
+
+## BOBYQA Algorithm
+
+### Reference
+
+> M. J. D. Powell, "The BOBYQA algorithm for bound constrained optimization without derivatives," Technical Report DAMTP 2009/NA06, Centre for Mathematical Sciences, University of Cambridge, 2009.
+
+### Key Idea
+
+BOBYQA is a derivative-free optimizer that:
+1. Builds a quadratic model using interpolation points
+2. Optimizes within a trust region
+3. Iteratively refines the solution as the trust region shrinks
+
+```
+Trust Region Concept:
+
+                    ●  interpolation points
+             ●      ○  current best
+               ╭─────╮
+            ●  │  ○  │  ●
+               │     │
+            ●  ╰─────╯  ●
+                    ●
+
+The quadratic model approximates f(x) locally.
+Trust region radius shrinks as we converge.
+```
+
+### Algorithm Steps
+
+```
+1. Initialize: Place n+1 to (n+1)(n+2)/2 interpolation points
+2. Build: Construct quadratic model from function values
+3. Solve: Find minimum of model within trust region
+4. Update: Evaluate function at trial point
+5. Adjust: Shrink/expand trust region based on actual vs predicted improvement
+6. Repeat: Until trust region radius < threshold
+```
+
+### Implementation Details
+
+```typescript
+interface BOBYQAOptions {
+  numberOfInterpolationPoints?: number;  // Default: 2n+1
+  initialTrustRegionRadius?: number;     // Starting radius
+  stoppingTrustRegionRadius?: number;    // Convergence threshold
+  maxEvaluations?: number;               // Maximum function calls
+}
+```
+
+### Configuration
+
+- **Interpolation points**: Between n+2 and (n+1)(n+2)/2 where n is dimension
+- **Trust region**: Starts large, shrinks during optimization
+- **Stopping radius**: Typically 1e-6 to 1e-8 for high precision
+
+### When to Use BOBYQA
+
+| Situation | Optimizer |
+|-----------|-----------|
+| Unknown landscape, need global search | DIRECT |
+| Near optimum, need refinement | BOBYQA |
+| Single-variable optimization | Brent |
+| Standard two-stage workflow | DIRECT → BOBYQA |
+
+## Two-Stage Optimization Pipeline
+
+The default optimization workflow uses both algorithms:
+
+```typescript
+// Stage 1: Global search with DIRECT
+const directResult = runDirect(objective, startPoint, {
+  maxEvaluations: maxEval / 2,
+});
+
+// Stage 2: Local refinement with BOBYQA
+const bobyqaResult = runBobyqa(objective, directResult.point, {
+  maxEvaluations: maxEval / 2,
+});
+
+// Use better result
+const finalPoint = bobyqaResult.value < directResult.value
+  ? bobyqaResult.point
+  : directResult.point;
+```
+
+This pipeline matches the Java WWIDesigner behavior.
 
 ## Related Documentation
 

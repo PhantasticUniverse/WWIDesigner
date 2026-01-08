@@ -41,7 +41,7 @@ The web interface is available at http://localhost:3000
 | [Tone Holes](docs/TONE-HOLES.md) | Hole acoustic model (Lefebvre-Scavone 2012) |
 | [Mouthpieces](docs/MOUTHPIECES.md) | Fipple, embouchure, and reed models |
 | [Termination](docs/TERMINATION.md) | Radiation impedance (Silva 2008) |
-| [Optimization](docs/OPTIMIZATION.md) | DIRECT algorithm for hole optimization |
+| [Optimization](docs/OPTIMIZATION.md) | DIRECT + BOBYQA algorithms for hole optimization |
 
 ### Developer Notes
 
@@ -143,7 +143,7 @@ bun test tests/parity/
 bun test tests/core/physical-parameters.test.ts
 ```
 
-**Test Summary**: 556 tests, including 68+ parity tests against Java output.
+**Test Summary**: 670 tests, including 68+ parity tests against Java output.
 
 ## References
 

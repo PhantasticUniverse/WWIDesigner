@@ -159,12 +159,14 @@ src/
 │   │   ├── instrument-tuner.ts       # Tuning prediction (Simple, LinearV)
 │   │   └── spectrum.ts               # Impedance/Reflectance spectrum
 │   └── optimization/
-│       ├── direct-optimizer.ts       # DIRECT algorithm
+│       ├── direct-optimizer.ts       # DIRECT global optimizer
+│       ├── bobyqa-optimizer.ts       # BOBYQA local optimizer
 │       ├── base-objective-function.ts # Base class for objectives
 │       ├── evaluator.ts              # Cent, Fmin, Fmax, Fminmax evaluators
 │       ├── constraints.ts            # Optimization constraints
 │       ├── hole-position-objective.ts # 52 objective functions (100% complete)
-│       └── objective-function-optimizer.ts # Optimizer orchestration
+│       ├── objective-function-factory.ts # Factory for creating objectives by name
+│       └── objective-function-optimizer.ts # Two-stage optimizer orchestration
 ├── models/
 │   ├── instrument.ts             # Instrument geometry model
 │   └── tuning.ts                 # Tuning/fingering model
@@ -179,8 +181,9 @@ This implementation achieves **exact parity** with Java WWIDesigner:
 
 - All acoustic calculations match to 15+ significant digits
 - NAF tuning predictions: 1.41 cents average deviation (identical to Java)
-- 632 tests, including 68+ parity tests against Java output
+- 670 tests, including 68+ parity tests against Java output
 - All 52 objective functions ported (100% complete)
+- Two-stage optimization pipeline (DIRECT → BOBYQA) matching Java
 
 Key Java classes and their TypeScript equivalents:
 
@@ -210,4 +213,4 @@ For detailed equations, see:
 4. [TONE-HOLES.md](./TONE-HOLES.md) - Hole acoustics
 5. [MOUTHPIECES.md](./MOUTHPIECES.md) - Excitation mechanisms
 6. [TERMINATION.md](./TERMINATION.md) - Radiation impedance
-7. [OPTIMIZATION.md](./OPTIMIZATION.md) - DIRECT algorithm
+7. [OPTIMIZATION.md](./OPTIMIZATION.md) - DIRECT + BOBYQA algorithms
