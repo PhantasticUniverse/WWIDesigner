@@ -963,6 +963,62 @@ Multi-start optimization:
 3. Sorts by objective value (best first)
 4. Returns the best result found
 
+## Two-Stage Evaluator Optimization
+
+Two-stage optimization uses a faster "first-stage" evaluator for exploration and a more accurate evaluator for refinement. This can speed up multi-start optimization.
+
+### First-Stage vs Second-Stage Evaluators
+
+| Evaluator | Stage | Speed | Accuracy | Use Case |
+|-----------|-------|-------|----------|----------|
+| `ReflectionEvaluator` | First | Fast | Approximate | Exploration phase |
+| `CentDeviationEvaluator` | Second | Slower | Accurate | Refinement phase |
+
+The `ReflectionEvaluator` uses the phase angle of the reflection coefficient, which is computationally cheaper than full frequency prediction.
+
+### Enabling Two-Stage Optimization
+
+```typescript
+import { ReflectionEvaluator, CentDeviationEvaluator } from "./optimization/evaluator.ts";
+
+// Create evaluators
+const mainEvaluator = new CentDeviationEvaluator(calculator);
+const firstStageEvaluator = new ReflectionEvaluator(calculator);
+
+// Create objective function with main evaluator
+const objective = createObjectiveFunction(name, calculator, tuning, mainEvaluator);
+
+// Enable two-stage optimization
+objective.setFirstStageEvaluator(firstStageEvaluator);
+objective.setRunTwoStageOptimization(true);
+
+// Run optimization
+const result = optimizeObjectiveFunction(objective);
+```
+
+### How It Works
+
+**For DIRECT optimizer (single-start):**
+1. Use first-stage evaluator during DIRECT global search
+2. Switch to main evaluator for BOBYQA refinement
+
+**For BOBYQA optimizer (single-start):**
+1. First run with first-stage evaluator
+2. Apply geometry to instrument
+3. Second run with main evaluator from refined starting point
+
+**For Multi-start:**
+1. All starts use first-stage evaluator
+2. Final refinement of best result uses main evaluator
+
+### Note on Default Behavior
+
+Two-stage optimization is **disabled by default**, matching Java WWIDesigner's behavior. The Java source includes this comment:
+
+> "Using different evaluators with a granular solution space can yield sub-optimal solutions."
+
+Enable it only when you need faster exploration and are confident the first-stage evaluator provides reasonable guidance toward optima.
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System overview

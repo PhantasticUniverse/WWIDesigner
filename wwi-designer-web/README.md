@@ -143,7 +143,7 @@ bun test tests/parity/
 bun test tests/core/physical-parameters.test.ts
 ```
 
-**Test Summary**: 685 tests, including 68+ parity tests against Java output.
+**Test Summary**: 696 tests, including 68+ parity tests against Java output.
 
 ## References
 

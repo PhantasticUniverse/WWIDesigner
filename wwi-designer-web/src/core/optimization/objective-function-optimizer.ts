@@ -455,8 +455,20 @@ export function optimizeObjectiveFunction(
       // Single-start optimization
       const optimizerType = objective.getOptimizerType();
 
+      // Check for two-stage optimization
+      const originalEvaluator = objective.getEvaluator();
+      const firstStageEvaluator = objective.getFirstStageEvaluator();
+      const runTwoStage = objective.isRunTwoStageOptimization() && firstStageEvaluator !== null;
+
       if (optimizerType === OptimizerType.DIRECT) {
         // Two-stage: DIRECT for global, then BOBYQA for local refinement
+
+        // Use first-stage evaluator for DIRECT if two-stage is enabled
+        if (runTwoStage && firstStageEvaluator) {
+          onProgress("Using first-stage evaluator for global search...");
+          objective.setEvaluator(firstStageEvaluator);
+        }
+
         onProgress("Running global optimization (DIRECT)...");
 
         const directResult = runDirect(objective, startPoint, {
@@ -467,6 +479,12 @@ export function optimizeObjectiveFunction(
         onProgress(
           `After ${directResult.evaluations} evaluations, global optimizer found optimum ${directResult.value.toFixed(4)}`
         );
+
+        // Switch back to original evaluator for BOBYQA refinement
+        if (runTwoStage) {
+          onProgress("Switching to full evaluator for refinement...");
+          objective.setEvaluator(originalEvaluator);
+        }
 
         // Refine with BOBYQA (matching Java's two-stage pipeline)
         onProgress("Refining with BOBYQA...");
@@ -487,13 +505,48 @@ export function optimizeObjectiveFunction(
           );
         }
       } else if (optimizerType === OptimizerType.BOBYQA) {
-        // Use BOBYQA directly for local optimization
-        onProgress("Running optimization (BOBYQA)...");
-        const result = runBobyqa(objective, startPoint, options);
-        finalPoint = result.point;
-        onProgress(
-          `BOBYQA found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
-        );
+        // BOBYQA optimization - two-stage runs twice if enabled
+
+        if (runTwoStage && firstStageEvaluator) {
+          // First run with first-stage evaluator
+          onProgress("Running optimization with first-stage evaluator...");
+          objective.setEvaluator(firstStageEvaluator);
+
+          const firstStageResult = runBobyqa(objective, startPoint, {
+            ...options,
+            maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
+          });
+
+          onProgress(
+            `First stage found ${firstStageResult.value.toFixed(4)} in ${firstStageResult.evaluations} evaluations`
+          );
+
+          // Apply geometry and get new start point
+          objective.setGeometryPoint(firstStageResult.point);
+          const refinedStart = objective.getInitialPoint();
+
+          // Switch to original evaluator for second run
+          onProgress("Refining with full evaluator...");
+          objective.setEvaluator(originalEvaluator);
+
+          const secondStageResult = runBobyqa(objective, refinedStart, {
+            ...options,
+            maxEvaluations: Math.floor((options.maxEvaluations ?? objective.getMaxEvaluations()) / 2),
+          });
+
+          finalPoint = secondStageResult.point;
+          onProgress(
+            `BOBYQA refined to ${secondStageResult.value.toFixed(4)} in ${secondStageResult.evaluations} evaluations`
+          );
+        } else {
+          // Single-stage BOBYQA
+          onProgress("Running optimization (BOBYQA)...");
+          const result = runBobyqa(objective, startPoint, options);
+          finalPoint = result.point;
+          onProgress(
+            `BOBYQA found optimum ${result.value.toFixed(4)} in ${result.evaluations} evaluations`
+          );
+        }
       } else if (optimizerType === OptimizerType.BRENT) {
         // Univariate optimization - use coordinate descent for now
         // TODO: Implement proper Brent optimizer for 1D
