@@ -94,7 +94,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **802 total tests**, all passing ✅
+- **803 total tests**, all passing ✅
 - **355 optimization tests** covering all algorithms and objective functions
 - **68+ parity tests** specifically for Java comparison
 - **20 BOBYQA optimizer tests** for convergence and bounds handling
@@ -104,7 +104,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - **18 Powell optimizer tests** for conjugate direction method
 - **15 multi-start optimization tests**
 - **11 two-stage evaluator tests**
-- **14 server API tests** for web server endpoints
+- **15 server API tests** for web server endpoints
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
 

@@ -13,7 +13,7 @@ This document provides a comprehensive mapping between the original Java WWIDesi
 | Tuners | 5 | 5 | **100%** |
 | Spectrum Analyzers | 3 | 3 | **100%** |
 | Range Processors | 3 | 3 | **100%** |
-| Tests | N/A | 802 | All passing |
+| Tests | N/A | 803 | All passing |
 
 ---
 
@@ -699,7 +699,7 @@ for each point i:
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| **Total Tests** | 802 | All passing |
+| **Total Tests** | 803 | All passing |
 | **Optimization Tests** | 355 | Optimizer + objective function tests |
 | **Parity Tests** | 68+ | Java comparison tests |
 | **BOBYQA Tests** | 20 | Convergence and bounds |
@@ -709,7 +709,7 @@ for each point i:
 | **Powell Tests** | 18 | Conjugate direction |
 | **Multi-Start Tests** | 15 | Range processors |
 | **Two-Stage Tests** | 11 | Evaluator switching |
-| **Server API Tests** | 14 | Web server endpoints |
+| **Server API Tests** | 15 | Web server endpoints |
 
 ### 9.2 Test Files
 
@@ -789,5 +789,5 @@ The following Java components are not yet implemented as they are rarely used:
 ---
 
 *Document generated: 2026-01-08*
-*TypeScript version: 802 tests passing*
+*TypeScript version: 803 tests passing*
 *Java reference: WWIDesigner 1.x*
