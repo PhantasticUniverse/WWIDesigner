@@ -94,7 +94,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 *2. Starting the component list from mouthpiece position (not first bore point), with headspace handled separately*
 
 #### Test Summary
-- **772 total tests**, all passing ✅
+- **802 total tests**, all passing ✅
 - **355 optimization tests** covering all algorithms and objective functions
 - **68+ parity tests** specifically for Java comparison
 - **20 BOBYQA optimizer tests** for convergence and bounds handling
@@ -104,6 +104,7 @@ The `tests/parity/` directory contains comprehensive tests verifying Java-TypeSc
 - **18 Powell optimizer tests** for conjugate direction method
 - **15 multi-start optimization tests**
 - **11 two-stage evaluator tests**
+- **14 server API tests** for web server endpoints
 - Tests use actual NAF sample instrument files and Java example files
 - Core calculations verified within 0.001% tolerance
 
@@ -295,6 +296,66 @@ The server will be available at http://localhost:3000
 - **Instrument Comparison**: Side-by-side comparison of two instruments
 - **XML Import/Export**: Save and load instruments in XML format
 - **Preferences**: Configure temperature, humidity, and other calculation parameters
+
+## Web Server API Endpoints
+
+The Bun.serve server exposes these REST API endpoints:
+
+### Core Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Serves the main web UI |
+| `/api/session` | POST | Create a new session, returns `{ sessionId }` |
+| `/api/session?id=<id>` | GET | Get session data |
+| `/api/calculate-tuning` | POST | Calculate predicted frequencies for fingerings |
+| `/api/optimize` | POST | Optimize instrument using objective function |
+| `/api/sketch` | POST | Get instrument sketch data for visualization |
+
+### Constraints API
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/constraints/get` | POST | Get constraints for objective function with intent |
+| `/api/constraints/parse` | POST | Parse constraints from XML or JSON content |
+| `/api/constraints/export` | POST | Export constraints to XML or JSON format |
+| `/api/constraints/objective-functions` | GET | List all objective functions with metadata |
+
+### Example API Usage
+
+**Calculate Tuning:**
+```json
+POST /api/calculate-tuning
+{
+  "instrument": { /* instrument object */ },
+  "tuning": { /* tuning object */ },
+  "temperature": 20,
+  "humidity": 45,
+  "calculatorType": "auto"
+}
+```
+
+**Optimize Instrument:**
+```json
+POST /api/optimize
+{
+  "instrument": { /* instrument object */ },
+  "tuning": { /* tuning object */ },
+  "objectiveFunction": "HolePositionObjectiveFunction",
+  "temperature": 20,
+  "humidity": 45
+}
+```
+Response: `{ optimizedInstrument, initialError, finalError, evaluations, success, dimensions }`
+
+**Get Constraints:**
+```json
+POST /api/constraints/get
+{
+  "instrument": { /* instrument object */ },
+  "tuning": { /* tuning object */ },
+  "objectiveFunction": "HolePositionObjectiveFunction",
+  "intent": "default"  // or "blank", "optimization"
+}
+```
 
 ---
 
