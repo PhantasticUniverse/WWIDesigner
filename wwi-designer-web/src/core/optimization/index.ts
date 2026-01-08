@@ -115,3 +115,11 @@ export {
   type OptimizationOutcome,
   type OptimizerOptions,
 } from "./objective-function-optimizer.ts";
+
+// Objective function factory
+export {
+  createObjectiveFunction,
+  getObjectiveFunctionsByCategory,
+  getObjectiveFunctionNames,
+  OBJECTIVE_FUNCTION_INFO,
+} from "./objective-function-factory.ts";

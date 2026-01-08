@@ -1051,7 +1051,7 @@ async function calculateTuning(instrumentId: string, tuningId: string) {
   }
 }
 
-async function optimizeInstrument(instrumentId: string, tuningId: string, type: string = "positions") {
+async function optimizeInstrument(instrumentId: string, tuningId: string, objectiveFunction: string) {
   const instrument = state.instruments.get(instrumentId);
   const tuning = state.tunings.get(tuningId);
 
@@ -1060,7 +1060,7 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, type: 
     return;
   }
 
-  log(`Optimizing instrument (${type})...`, "info");
+  log(`Optimizing with ${objectiveFunction}...`, "info");
 
   try {
     const response = await fetch("/api/optimize", {
@@ -1069,7 +1069,7 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, type: 
       body: JSON.stringify({
         instrument,
         tuning,
-        optimizationType: type,
+        objectiveFunction,
         temperature: state.preferences.temperature,
         humidity: state.preferences.humidity,
       }),
@@ -1083,7 +1083,7 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, type: 
     }
 
     log(
-      `Optimization complete. Error reduced from ${data.initialError.toFixed(2)} to ${data.finalError.toFixed(2)}`,
+      `Optimization complete (${data.dimensions} variables). Error: ${data.initialError.toFixed(2)} → ${data.finalError.toFixed(2)}`,
       "success"
     );
 
@@ -1586,15 +1586,24 @@ function showOptimizeModal() {
 
   if (!modal || !title || !content || !footer) return;
 
+  // Get display name for selected optimizer
+  const optimizerDisplayNames: Record<string, string> = {
+    FippleFactorObjectiveFunction: "Fipple factor",
+    HolePositionObjectiveFunction: "Hole size & position",
+    HoleSizeObjectiveFunction: "Hole size only",
+    HoleGroupPositionObjectiveFunction: "Grouped-hole position & size",
+    SingleTaperHoleGroupObjectiveFunction: "Single taper, grouped hole",
+    SingleTaperHemiHeadGroupedHoleObjectiveFunction: "Single taper, hemi-head, grouped hole",
+    SingleTaperHemiHeadNoHoleGroupingObjectiveFunction: "Single taper, hemi-head, no hole grouping",
+    SingleTaperNoHoleGroupingObjectiveFunction: "Single taper, no hole grouping",
+  };
+  const optimizerName = optimizerDisplayNames[state.selectedOptimizer] || state.selectedOptimizer;
+
   title.textContent = "Optimize Instrument";
   content.innerHTML = `
     <div class="form-group">
-      <label>Optimization Type</label>
-      <select id="opt-type">
-        <option value="positions">Hole Positions</option>
-        <option value="sizes">Hole Sizes</option>
-        <option value="both">Positions and Sizes</option>
-      </select>
+      <label>Optimizer (selected in sidebar)</label>
+      <input type="text" readonly value="${optimizerName}" />
     </div>
     <div class="form-group">
       <label>Selected Instrument</label>
@@ -1604,6 +1613,9 @@ function showOptimizeModal() {
       <label>Selected Tuning</label>
       <input type="text" readonly value="${state.tunings.get(state.selectedTuning!)?.name || ""}" />
     </div>
+    <p style="margin-top: 12px; color: var(--text-secondary); font-size: 12px;">
+      Change optimizer selection in the sidebar before clicking Optimize.
+    </p>
   `;
 
   footer.innerHTML = `
@@ -1614,10 +1626,8 @@ function showOptimizeModal() {
   modal.classList.add("open");
 
   $("#run-optimize")?.addEventListener("click", () => {
-    const typeSelect = $<HTMLSelectElement>("#opt-type");
-    const type = typeSelect?.value || "positions";
     modal.classList.remove("open");
-    optimizeInstrument(state.selectedInstrument!, state.selectedTuning!, type);
+    optimizeInstrument(state.selectedInstrument!, state.selectedTuning!, state.selectedOptimizer);
   });
 }
 

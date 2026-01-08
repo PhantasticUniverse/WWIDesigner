@@ -14,11 +14,11 @@ import {
 import { SimpleInstrumentTuner } from "../core/modelling/instrument-tuner.ts";
 import { CentDeviationEvaluator } from "../core/optimization/evaluator.ts";
 import {
-  HolePositionObjectiveFunction,
-  HoleSizeObjectiveFunction,
-  HoleObjectiveFunction,
-} from "../core/optimization/hole-position-objective.ts";
-import { optimizeObjectiveFunction } from "../core/optimization/objective-function-optimizer.ts";
+  optimizeObjectiveFunction,
+  createObjectiveFunction,
+  getObjectiveFunctionsByCategory,
+  OBJECTIVE_FUNCTION_INFO,
+} from "../core/optimization/index.ts";
 import type { Instrument } from "../models/instrument.ts";
 import type { Tuning, Fingering } from "../models/tuning.ts";
 
@@ -109,7 +109,7 @@ async function handleOptimize(req: Request): Promise<Response> {
     const {
       instrument,
       tuning,
-      optimizationType = "positions",
+      objectiveFunction = "HolePositionObjectiveFunction",
       temperature = 20,
       humidity = 45,
       calculatorType = "auto" as CalculatorType,
@@ -119,25 +119,24 @@ async function handleOptimize(req: Request): Promise<Response> {
       return Response.json({ error: "Missing instrument or tuning" }, { status: 400 });
     }
 
+    // Validate objective function name
+    if (!OBJECTIVE_FUNCTION_INFO[objectiveFunction]) {
+      return Response.json(
+        { error: `Unknown objective function: ${objectiveFunction}` },
+        { status: 400 }
+      );
+    }
+
     // PhysicalParameters(temp, tempType, pressure, humidity, xCO2)
     const params = new PhysicalParameters(temperature, "C", 101.325, humidity, 0.00039);
     // Use calculator factory with type detection or explicit type
     const calc = createCalculator(instrument, params, calculatorType);
     const evaluator = new CentDeviationEvaluator(calc);
 
-    let objective;
-    switch (optimizationType) {
-      case "sizes":
-        objective = new HoleSizeObjectiveFunction(calc, tuning, evaluator);
-        break;
-      case "both":
-        objective = new HoleObjectiveFunction(calc, tuning, evaluator);
-        break;
-      case "positions":
-      default:
-        objective = new HolePositionObjectiveFunction(calc, tuning, evaluator);
-        break;
-    }
+    // Create objective function using factory
+    const objective = createObjectiveFunction(objectiveFunction, calc, tuning, evaluator);
+
+    console.log(`Optimizing with ${objectiveFunction}, ${objective.getNrDimensions()} variables`);
 
     const result = optimizeObjectiveFunction(objective, {
       maxIterations: 1000,
@@ -150,6 +149,8 @@ async function handleOptimize(req: Request): Promise<Response> {
       finalError: result.finalValue,
       iterations: result.iterations,
       converged: result.converged,
+      objectiveFunction: objectiveFunction,
+      dimensions: objective.getNrDimensions(),
     });
   } catch (error) {
     console.error("Optimize error:", error);
