@@ -42,6 +42,15 @@ interface AppState {
     humidity: number;
     studyType: string;
     lengthUnit: "MM" | "IN";
+    // General Study Options
+    useDirectOptimizer: boolean;
+    maxNoteSpectrumMultiplier: number;
+    // NAF Study Options
+    numberOfStarts: number;
+    // Whistle/Flute Study Options
+    blowingLevel: number;
+    pressure: number; // kPa
+    co2Ppm: number;
   };
 }
 
@@ -58,8 +67,17 @@ const state: AppState = {
   preferences: {
     temperature: 20,
     humidity: 45,
-    studyType: "whistle",
+    studyType: "naf",
     lengthUnit: "MM",
+    // General Study Options
+    useDirectOptimizer: true,
+    maxNoteSpectrumMultiplier: 3.17,
+    // NAF Study Options
+    numberOfStarts: 30,
+    // Whistle/Flute Study Options
+    blowingLevel: 5,
+    pressure: 101.325,
+    co2Ppm: 390,
   },
 };
 
@@ -1170,6 +1188,11 @@ async function optimizeInstrument(instrumentId: string, tuningId: string, object
         objectiveFunction,
         temperature: state.preferences.temperature,
         humidity: state.preferences.humidity,
+        pressure: state.preferences.pressure,
+        co2Ppm: state.preferences.co2Ppm,
+        useDirectOptimizer: state.preferences.useDirectOptimizer,
+        numberOfStarts: state.preferences.numberOfStarts,
+        blowingLevel: state.preferences.blowingLevel,
       }),
     });
 
@@ -1956,29 +1979,76 @@ function showPreferencesModal() {
 
   title.textContent = "Preferences";
   content.innerHTML = `
-    <div class="form-group">
-      <label>Temperature (°C)</label>
-      <input type="number" id="pref-temperature" value="${state.preferences.temperature}" step="0.5" />
+    <style>
+      .pref-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+      .pref-tab { padding: 8px 16px; cursor: pointer; border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; background: var(--bg-secondary); }
+      .pref-tab.active { background: var(--bg-primary); border-color: var(--border); border-bottom-color: var(--bg-primary); }
+      .pref-panel { display: none; }
+      .pref-panel.active { display: block; }
+      .pref-checkbox { display: flex; align-items: center; gap: 8px; }
+      .pref-checkbox input { width: auto; }
+    </style>
+    <div class="pref-tabs">
+      <div class="pref-tab active" data-panel="general">General Study Options</div>
+      <div class="pref-tab" data-panel="naf">NAF Study Options</div>
+      <div class="pref-tab" data-panel="whistle">Whistle/Flute Options</div>
     </div>
-    <div class="form-group">
-      <label>Humidity (%)</label>
-      <input type="number" id="pref-humidity" value="${state.preferences.humidity}" step="1" min="0" max="100" />
+
+    <div class="pref-panel active" id="panel-general">
+      <div class="form-group">
+        <label>Study Type</label>
+        <select id="pref-study-type">
+          <option value="naf" ${state.preferences.studyType === "naf" ? "selected" : ""}>NAF Study</option>
+          <option value="whistle" ${state.preferences.studyType === "whistle" ? "selected" : ""}>Whistle Study</option>
+          <option value="flute" ${state.preferences.studyType === "flute" ? "selected" : ""}>Flute Study</option>
+          <option value="reed" ${state.preferences.studyType === "reed" ? "selected" : ""}>Reed Study</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Length Type</label>
+        <select id="pref-length-unit">
+          <option value="MM" ${state.preferences.lengthUnit === "MM" ? "selected" : ""}>MM</option>
+          <option value="IN" ${state.preferences.lengthUnit === "IN" ? "selected" : ""}>IN</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Temperature (°C)</label>
+        <input type="number" id="pref-temperature" value="${state.preferences.temperature}" step="0.5" />
+      </div>
+      <div class="form-group">
+        <label>Humidity (%)</label>
+        <input type="number" id="pref-humidity" value="${state.preferences.humidity}" step="1" min="0" max="100" />
+      </div>
+      <div class="form-group pref-checkbox">
+        <input type="checkbox" id="pref-use-direct" ${state.preferences.useDirectOptimizer ? "checked" : ""} />
+        <label for="pref-use-direct">Use DIRECT optimizer (slow & thorough)</label>
+      </div>
+      <div class="form-group">
+        <label>Max Note Spectrum freq (multiplier)</label>
+        <input type="number" id="pref-spectrum-mult" value="${state.preferences.maxNoteSpectrumMultiplier}" step="0.01" />
+      </div>
     </div>
-    <div class="form-group">
-      <label>Default Length Unit</label>
-      <select id="pref-length-unit">
-        <option value="MM" ${state.preferences.lengthUnit === "MM" ? "selected" : ""}>Millimeters (mm)</option>
-        <option value="IN" ${state.preferences.lengthUnit === "IN" ? "selected" : ""}>Inches (in)</option>
-      </select>
+
+    <div class="pref-panel" id="panel-naf">
+      <div class="form-group">
+        <label>Number of starts for multi-Start optimizations</label>
+        <input type="number" id="pref-num-starts" value="${state.preferences.numberOfStarts}" step="1" min="1" />
+      </div>
     </div>
-    <div class="form-group">
-      <label>Default Study Type</label>
-      <select id="pref-study-type">
-        <option value="whistle" ${state.preferences.studyType === "whistle" ? "selected" : ""}>Whistle</option>
-        <option value="flute" ${state.preferences.studyType === "flute" ? "selected" : ""}>Flute</option>
-        <option value="naf" ${state.preferences.studyType === "naf" ? "selected" : ""}>Native American Flute</option>
-        <option value="reed" ${state.preferences.studyType === "reed" ? "selected" : ""}>Reed Instrument</option>
-      </select>
+
+    <div class="pref-panel" id="panel-whistle">
+      <div class="form-group">
+        <label>Blowing Level</label>
+        <input type="number" id="pref-blowing-level" value="${state.preferences.blowingLevel}" step="1" min="0" max="10" />
+      </div>
+      <div class="form-group">
+        <label>Pressure (kPa)</label>
+        <input type="number" id="pref-pressure" value="${state.preferences.pressure}" step="0.001" />
+      </div>
+      <div class="form-group">
+        <label>CO2 (ppm)</label>
+        <input type="number" id="pref-co2" value="${state.preferences.co2Ppm}" step="1" />
+      </div>
     </div>
   `;
 
@@ -1989,14 +2059,61 @@ function showPreferencesModal() {
 
   modal.classList.add("open");
 
+  // Tab switching
+  $$(".pref-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      $$(".pref-tab").forEach(t => t.classList.remove("active"));
+      $$(".pref-panel").forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      const panelId = tab.getAttribute("data-panel");
+      $(`#panel-${panelId}`)?.classList.add("active");
+    });
+  });
+
   $("#save-preferences")?.addEventListener("click", () => {
+    // Read all values
+    const oldPrefs = { ...state.preferences };
+
     state.preferences.temperature = parseFloat(($<HTMLInputElement>("#pref-temperature"))?.value || "20");
     state.preferences.humidity = parseFloat(($<HTMLInputElement>("#pref-humidity"))?.value || "45");
     state.preferences.lengthUnit = ($<HTMLSelectElement>("#pref-length-unit"))?.value as "MM" | "IN" || "MM";
-    state.preferences.studyType = ($<HTMLSelectElement>("#pref-study-type"))?.value || "whistle";
+    state.preferences.studyType = ($<HTMLSelectElement>("#pref-study-type"))?.value || "naf";
+    state.preferences.useDirectOptimizer = ($<HTMLInputElement>("#pref-use-direct"))?.checked || false;
+    state.preferences.maxNoteSpectrumMultiplier = parseFloat(($<HTMLInputElement>("#pref-spectrum-mult"))?.value || "3.17");
+    state.preferences.numberOfStarts = parseInt(($<HTMLInputElement>("#pref-num-starts"))?.value || "30", 10);
+    state.preferences.blowingLevel = parseInt(($<HTMLInputElement>("#pref-blowing-level"))?.value || "5", 10);
+    state.preferences.pressure = parseFloat(($<HTMLInputElement>("#pref-pressure"))?.value || "101.325");
+    state.preferences.co2Ppm = parseInt(($<HTMLInputElement>("#pref-co2"))?.value || "390", 10);
+
     modal.classList.remove("open");
     log("Preferences saved", "success");
+
+    // Output air properties to console (like Java does)
+    logAirProperties();
   });
+}
+
+// Log air properties to console (mimics Java behavior)
+function logAirProperties() {
+  const { temperature, humidity, pressure, co2Ppm } = state.preferences;
+
+  // Calculate speed of sound using simplified formula
+  // Full calculation is done server-side, this is just for display
+  const tempK = temperature + 273.15;
+  const gamma = 1.4;
+  const R = 287.05; // J/(kg·K) for dry air
+  const speedOfSound = Math.sqrt(gamma * R * tempK);
+
+  // Simplified density calculation
+  const density = (pressure * 1000) / (R * tempK);
+
+  // Simplified epsilon factor (this is approximate)
+  const epsilon = 1.613e-3;
+
+  log(`Properties of air at ${temperature.toFixed(2)} C, ${pressure.toFixed(3)} kPa, ${humidity}% humidity, ${co2Ppm} ppm CO2:`);
+  log(`Speed of sound is ${speedOfSound.toFixed(3)} m/s.`);
+  log(`Density is ${density.toFixed(4)} kg/m^3.`);
+  log(`Epsilon factor is ${epsilon.toExponential(3)}.`);
 }
 
 // Optimization Modal

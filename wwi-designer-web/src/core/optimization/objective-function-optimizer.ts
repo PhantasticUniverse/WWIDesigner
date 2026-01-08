@@ -70,6 +70,8 @@ export interface OptimizerOptions {
   multiStartStrategy?: "random" | "grid" | "lhs";
   /** Indices of dimensions to vary in multi-start (null = all) */
   indicesToVary?: number[] | null;
+  /** Force use of DIRECT optimizer regardless of objective function's preference */
+  forceDirectOptimizer?: boolean;
 }
 
 /**
@@ -383,7 +385,10 @@ function doSingleStart(
   startPoint: number[],
   options: OptimizerOptions
 ): SingleStartResult {
-  const optimizerType = objective.getOptimizerType();
+  // Use DIRECT if forceDirectOptimizer is set, otherwise use objective's preferred type
+  const optimizerType = options.forceDirectOptimizer
+    ? OptimizerType.DIRECT
+    : objective.getOptimizerType();
 
   let result: OptimizationResult;
 
@@ -616,7 +621,10 @@ export function optimizeObjectiveFunction(
       );
     } else {
       // Single-start optimization
-      const optimizerType = objective.getOptimizerType();
+      // Use DIRECT if forceDirectOptimizer is set, otherwise use objective's preferred type
+      const optimizerType = options.forceDirectOptimizer
+        ? OptimizerType.DIRECT
+        : objective.getOptimizerType();
 
       // Check for two-stage optimization
       const originalEvaluator = objective.getEvaluator();

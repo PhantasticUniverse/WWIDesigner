@@ -120,6 +120,10 @@ async function handleOptimize(req: Request): Promise<Response> {
       objectiveFunction = "HolePositionObjectiveFunction",
       temperature = 20,
       humidity = 45,
+      pressure = 101.325,
+      co2Ppm = 390,
+      useDirectOptimizer = false,
+      numberOfStarts = 0,
       calculatorType = "auto" as CalculatorType,
     } = body;
 
@@ -139,7 +143,16 @@ async function handleOptimize(req: Request): Promise<Response> {
     const originalLengthType: LengthType = instrument.lengthType || "MM";
 
     // PhysicalParameters(temp, tempType, pressure, humidity, xCO2)
-    const params = new PhysicalParameters(temperature, "C", 101.325, humidity, 0.00039);
+    // Convert CO2 from ppm to fraction (e.g., 390 ppm = 0.00039)
+    const xCO2 = co2Ppm / 1000000;
+    const params = new PhysicalParameters(temperature, "C", pressure, humidity, xCO2);
+
+    // Log air properties (matching Java format)
+    console.log(`Properties of air at ${temperature.toFixed(2)} C, ${pressure.toFixed(3)} kPa, ${humidity}% humidity, ${co2Ppm} ppm CO2:`);
+    console.log(`Speed of sound is ${params.speedOfSound().toFixed(3)} m/s.`);
+    console.log(`Density is ${params.rho.toFixed(4)} kg/m^3.`);
+    console.log(`Epsilon factor is ${(params.alpha / Math.sqrt(params.speedOfSound())).toExponential(3)}.`);
+
     // Use calculator factory with type detection or explicit type
     const calc = createCalculator(instrument, params, calculatorType);
     const evaluator = new CentDeviationEvaluator(calc);
@@ -156,9 +169,12 @@ async function handleOptimize(req: Request): Promise<Response> {
     const startTime = performance.now();
 
     // Use objective function's default maxEvaluations
-    // (each objective function specifies its own limits based on complexity)
+    // forceDirectOptimizer: uses DIRECT global optimizer (slow but thorough)
+    // numberOfStarts: multi-start optimization with specified number of starting points
     const result = optimizeObjectiveFunction(objective, {
       onProgress: (message) => console.log(message),
+      forceDirectOptimizer: useDirectOptimizer,
+      numberOfStarts: numberOfStarts > 0 ? numberOfStarts : undefined,
     });
 
     const elapsedTime = (performance.now() - startTime) / 1000;
