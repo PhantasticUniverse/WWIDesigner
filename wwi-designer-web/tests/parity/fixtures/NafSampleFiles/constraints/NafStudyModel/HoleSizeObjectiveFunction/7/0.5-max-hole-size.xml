@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:constraints xmlns:ns2="http://www.wwidesigner.com/Constraints">
+    <constraintsName>1/2" max hole size</constraintsName>
+    <objectiveDisplayName>Hole size optimizer</objectiveDisplayName>
+    <objectiveFunctionName>HoleSizeObjectiveFunction</objectiveFunctionName>
+    <numberOfHoles>7</numberOfHoles>
+    <constraint>
+        <displayName>Hole 7 (top) diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.0015875</lowerBound>
+        <upperBound>0.0127</upperBound>
+    </constraint>
+    <constraint>
+        <displayName>Hole 6 diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.003175</lowerBound>
+        <upperBound>0.0127</upperBound>
+    </constraint>
+    <constraint>
+        <displayName>Hole 5 diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.003175</lowerBound>
+        <upperBound>0.0127</upperBound>
+    </constraint>
+    <constraint>
+        <displayName>Hole 4 diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.003175</lowerBound>
+        <upperBound>0.0127</upperBound>
+    </constraint>
+    <constraint>
+        <displayName>Hole 3 diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.003175</lowerBound>
+        <upperBound>0.0127</upperBound>
+    </constraint>
+    <constraint>
+        <displayName>Hole 2 diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.0015875</lowerBound>
+        <upperBound>0.0079375</upperBound>
+    </constraint>
+    <constraint>
+        <displayName>Hole 1 (bottom) diameter</displayName>
+        <category>Hole size</category>
+        <type>DIMENSIONAL</type>
+        <lowerBound>0.0015875</lowerBound>
+        <upperBound>0.0079375</upperBound>
+    </constraint>
+</ns2:constraints>

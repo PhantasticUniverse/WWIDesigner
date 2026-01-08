@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:instrument xmlns:ns2="http://www.wwidesigner.com/Instrument">
+    <name>G 0-hole NAF start</name>
+    <description>Base NAF file for creating a midrange flute</description>
+    <lengthType>in</lengthType>
+    <mouthpiece>
+        <position>0.1700002970001691</position>
+        <fipple>
+            <windowLength>0.1700002646001429</windowLength>
+            <windowWidth>0.5430002932200001</windowWidth>
+            <fippleFactor>0.758</fippleFactor>
+            <windwayHeight>0.03200001728</windwayHeight>
+        </fipple>
+    </mouthpiece>
+    <borePoint>
+        <borePosition>-0.0300000162</borePosition>
+        <boreDiameter>0.8971246717221206</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>5.925067011406214</borePosition>
+        <boreDiameter>0.8971246717221206</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>10.470884113547973</borePosition>
+        <boreDiameter>0.8700004698000005</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>12.269313784375623</borePosition>
+        <boreDiameter>0.8700004698000005</boreDiameter>
+    </borePoint>
+    <termination>
+        <flangeDiameter>1.100000594</flangeDiameter>
+    </termination>
+</ns2:instrument>

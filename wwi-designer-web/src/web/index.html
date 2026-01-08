@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WWIDesigner - Woodwind Instrument Designer</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header / Toolbar -->
+    <header class="toolbar">
+      <div class="toolbar-brand">
+        <h1>WWIDesigner</h1>
+        <span class="version">Web Edition</span>
+      </div>
+      <nav class="toolbar-menu">
+        <div class="menu-group">
+          <button class="menu-btn" data-menu="file">File</button>
+          <div class="dropdown" id="menu-file">
+            <button data-action="new-instrument">New Instrument</button>
+            <button data-action="new-tuning">New Tuning</button>
+            <hr>
+            <button data-action="open-instrument">Open Instrument...</button>
+            <button data-action="open-tuning">Open Tuning...</button>
+            <hr>
+            <button data-action="open-constraints">Open Constraints...</button>
+            <hr>
+            <button data-action="save">Save</button>
+            <button data-action="save-as">Save As...</button>
+            <hr>
+            <button data-action="export-xml">Export XML</button>
+          </div>
+        </div>
+        <div class="menu-group">
+          <button class="menu-btn" data-menu="tools">Tools</button>
+          <div class="dropdown" id="menu-tools">
+            <button data-action="calculate-tuning">Calculate Tuning</button>
+            <button data-action="graph-tuning">Graph Tuning</button>
+            <hr>
+            <button data-action="optimize">Optimize Instrument</button>
+            <hr>
+            <button data-action="sketch">Sketch Instrument</button>
+            <button data-action="compare">Compare Instruments</button>
+          </div>
+        </div>
+        <div class="menu-group">
+          <button class="menu-btn" data-menu="view">View</button>
+          <div class="dropdown" id="menu-view">
+            <button data-action="toggle-sidebar">Toggle Sidebar</button>
+            <button data-action="toggle-console">Toggle Console</button>
+            <hr>
+            <button data-action="view-xml">View as XML</button>
+            <button data-action="view-form">View as Form</button>
+          </div>
+        </div>
+        <div class="menu-group">
+          <button class="menu-btn" data-menu="settings">Settings</button>
+          <div class="dropdown" id="menu-settings">
+            <button data-action="preferences">Preferences...</button>
+          </div>
+        </div>
+        <div class="menu-group">
+          <button class="menu-btn" data-menu="help">Help</button>
+          <div class="dropdown" id="menu-help">
+            <button data-action="about">About WWIDesigner</button>
+            <button data-action="docs">Documentation</button>
+          </div>
+        </div>
+      </nav>
+      <div class="toolbar-actions">
+        <button class="action-btn primary" data-action="calculate-tuning" title="Calculate Tuning">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+          Calculate
+        </button>
+        <button class="action-btn" data-action="optimize" title="Optimize Instrument">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          Optimize
+        </button>
+        <button class="action-btn" data-action="sketch" title="Sketch Instrument">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          Sketch
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h2>Study</h2>
+          <select id="study-type">
+            <option value="naf" selected>Native American Flute</option>
+            <option value="whistle">Whistle</option>
+            <option value="flute">Flute</option>
+            <option value="reed">Reed Instrument</option>
+          </select>
+        </div>
+        <div class="sidebar-content">
+          <div class="tree-section">
+            <div class="tree-header" data-category="instruments">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Instrument</span>
+            </div>
+            <ul class="tree-list" id="instruments-list"></ul>
+          </div>
+          <div class="tree-section">
+            <div class="tree-header" data-category="tunings">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Tuning</span>
+            </div>
+            <ul class="tree-list" id="tunings-list"></ul>
+          </div>
+          <div class="tree-section">
+            <div class="tree-header expanded" data-category="multistart">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Multi-start optimization</span>
+            </div>
+            <ul class="tree-list" id="multistart-list">
+              <li class="selected" data-value="none">No multi-start optimization</li>
+              <li data-value="bore-length">Vary bore length</li>
+            </ul>
+          </div>
+          <div class="tree-section">
+            <div class="tree-header expanded" data-category="optimizer">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Optimizer</span>
+            </div>
+            <ul class="tree-list" id="optimizer-list">
+              <li data-value="FippleFactorObjectiveFunction">Fipple factor</li>
+              <li data-value="GroupedHolePositionObjectiveFunction">Grouped-hole position & size</li>
+              <li class="selected" data-value="HolePositionObjectiveFunction">Hole size & position</li>
+              <li data-value="HoleSizeObjectiveFunction">Hole size only</li>
+              <li data-value="SingleTaperGroupedHoleObjectiveFunction">Single taper, grouped hole</li>
+              <li data-value="SingleTaperHemiHeadGroupedHoleObjectiveFunction">Single taper, hemi-head, grouped hole</li>
+              <li data-value="SingleTaperHemiHeadNoHoleGroupingObjectiveFunction">Single taper, hemi-head, no hole grouping</li>
+              <li data-value="SingleTaperNoHoleGroupingObjectiveFunction">Single taper, no hole grouping</li>
+            </ul>
+          </div>
+          <div class="tree-section">
+            <div class="tree-header" data-category="constraints">
+              <span class="tree-toggle">&#9654;</span>
+              <span>Constraints</span>
+            </div>
+            <ul class="tree-list" id="constraints-list"></ul>
+          </div>
+        </div>
+        <div class="sidebar-footer">
+          <button class="btn-small" data-action="load-sample">Load Sample</button>
+        </div>
+      </aside>
+
+      <!-- Content Area -->
+      <main class="content-area">
+        <!-- Tabs -->
+        <div class="tabs-bar" id="tabs-bar">
+          <div class="tab active" data-tab="welcome">
+            <span>Welcome</span>
+          </div>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="tab-panels" id="tab-panels">
+          <!-- Welcome Panel -->
+          <div class="tab-panel active" id="panel-welcome">
+            <div class="welcome-content">
+              <h2>Welcome to WWIDesigner</h2>
+              <p>Woodwind Instrument Designer - Web Edition</p>
+              <div class="quick-actions">
+                <button class="quick-action" data-action="new-instrument">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  <span>New Instrument</span>
+                </button>
+                <button class="quick-action" data-action="load-sample">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                  <span>Load Sample</span>
+                </button>
+                <button class="quick-action" data-action="open-instrument">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                  <span>Open Instrument</span>
+                </button>
+                <button class="quick-action" data-action="open-tuning">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                  <span>Open Tuning</span>
+                </button>
+                <button class="quick-action" data-action="open-constraints">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                  <span>Open Constraints</span>
+                </button>
+              </div>
+              <div class="info-section">
+                <h3>About</h3>
+                <p>WWIDesigner helps you design and optimize woodwind instruments using acoustic modeling and multi-variable optimization algorithms.</p>
+                <h4>Supported Instruments</h4>
+                <ul>
+                  <li>Whistles and Fipple Flutes</li>
+                  <li>Transverse Flutes</li>
+                  <li>Native American Flutes</li>
+                  <li>Reed Instruments</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Resize Handle -->
+      <div class="resize-handle-h" id="console-resize"></div>
+
+      <!-- Console -->
+      <div class="console-panel" id="console-panel">
+        <div class="console-header">
+          <span>Console</span>
+          <button class="btn-icon" data-action="clear-console" title="Clear">&#10006;</button>
+        </div>
+        <div class="console-content" id="console-content">
+          <div class="log-entry info">WWIDesigner Web initialized.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Container -->
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <h3 id="modal-title">Modal</h3>
+          <button class="btn-icon" data-action="close-modal">&#10006;</button>
+        </div>
+        <div class="modal-content" id="modal-content"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+      </div>
+    </div>
+
+    <!-- About Modal -->
+    <div class="modal-overlay" id="about-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>About WWIDesigner</h3>
+          <button class="btn-icon" data-action="close-about">&#10006;</button>
+        </div>
+        <div class="modal-content">
+          <h2>WWIDesigner Web Edition</h2>
+          <p>Version 2.6.0-web</p>
+          <p>A tool for designing and optimizing woodwind instruments.</p>
+          <hr>
+          <p><strong>Original Authors:</strong> Edward Kort, Antoine Lefebvre, Burton Patkau</p>
+          <p><strong>Web Port:</strong> WWIDesigner Contributors</p>
+          <hr>
+          <p>Licensed under GPL-3.0</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn primary" data-action="close-about">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./frontend.ts"></script>
+</body>
+</html>

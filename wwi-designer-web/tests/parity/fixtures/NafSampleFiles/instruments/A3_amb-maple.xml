@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:instrument xmlns:ns2="http://www.wwidesigner.com/Instrument">
+    <name>A3 6-hole NAF ambrosia maple</name>
+    <description>A3 tapered bore, ambrosia maple, chimney, 12/22/2013</description>
+    <lengthType>in</lengthType>
+    <mouthpiece>
+        <position>0.23000024840006705</position>
+        <fipple>
+            <windowLength>0.23000024840006705</windowLength>
+            <windowWidth>0.7700008316002245</windowWidth>
+            <fippleFactor>0.7407511141551237</fippleFactor>
+            <windwayHeight>0.032000224640727826</windwayHeight>
+        </fipple>
+    </mouthpiece>
+    <borePoint>
+        <borePosition>-0.030000210600682344</borePosition>
+        <boreDiameter>1.430001544400417</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>12.700013716003705</borePosition>
+        <boreDiameter>1.4080015206404104</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>17.80001922400519</borePosition>
+        <boreDiameter>1.2230013208403567</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>24.375259649149645</borePosition>
+        <boreDiameter>1.2310074558341226</boreDiameter>
+    </borePoint>
+    <hole>
+        <name>Hole 6</name>
+        <borePosition>7.602178060704097</borePosition>
+        <diameter>0.34617660785953186</diameter>
+        <height>0.15500008369999999</height>
+    </hole>
+    <hole>
+        <name>Hole 5</name>
+        <borePosition>9.003753620704098</borePosition>
+        <diameter>0.3918780980948957</diameter>
+        <height>0.15600008423999998</height>
+    </hole>
+    <hole>
+        <name>Hole 4</name>
+        <borePosition>10.405329180704097</borePosition>
+        <diameter>0.34829512479814756</diameter>
+        <height>0.15800008531999998</height>
+    </hole>
+    <hole>
+        <name>Hole 3, angle up</name>
+        <borePosition>13.161236180704098</borePosition>
+        <diameter>0.398701</diameter>
+        <height>0.16100008694</height>
+    </hole>
+    <hole>
+        <name>Hole 2, angle down</name>
+        <borePosition>14.562811740704099</borePosition>
+        <diameter>0.37025902690841484</diameter>
+        <height>0.19900010746000002</height>
+    </hole>
+    <hole>
+        <name>Hole 1,angle down 22 degrees</name>
+        <borePosition>15.962811740704099</borePosition>
+        <diameter>0.3451022213455206</diameter>
+        <height>0.22200011988</height>
+    </hole>
+    <termination>
+        <flangeDiameter>1.470007198215664</flangeDiameter>
+    </termination>
+</ns2:instrument>
