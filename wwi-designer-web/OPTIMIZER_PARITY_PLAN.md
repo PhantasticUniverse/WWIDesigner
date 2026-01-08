@@ -7,7 +7,7 @@ Systematic plan to achieve full optimizer parity between Java WWIDesigner and Ty
 - **Acoustic Engine:** 100% parity
 - **Optimizer:** 100% parity (DIRECT + BOBYQA + Brent + CMA-ES + Simplex + Powell + Multi-Start + Two-Stage implemented)
 - **Objective Functions:** 51/51 implemented (100% complete - verified against Java)
-- **Tests:** 772 passing (355 optimization tests)
+- **Tests:** 803 passing (355 optimization tests)
 
 ---
 
@@ -247,7 +247,7 @@ Week 6: Phase 5-6 (Polish)
 
 ## Success Criteria
 
-1. **All 54 objective functions** implemented and tested
+1. **All 51 objective functions** implemented and tested
 2. **BOBYQA algorithm** working with bounded optimization
 3. **Multi-start framework** with 30-start capability
 4. **Parity tests pass** with < 1% variance from Java
