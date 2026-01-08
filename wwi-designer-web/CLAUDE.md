@@ -34,6 +34,30 @@
 - **Study Framework** (NafStudyModel, WhistleStudyModel, etc.): Application workflow patterns - not needed for core functionality
 - **WhistleEvaluator**: Requires WhistleCalculator extensions
 
+### Known Issues
+
+| Issue | Impact | Potential Fix |
+|-------|--------|---------------|
+| **Immutable Complex class creates excessive objects** | Slower than Java (~4-5x for heavy optimization) | Add mutable in-place operations (`addInPlace`, `multiplyInPlace`) or use flat array representation `[re, im]` instead of objects |
+| **TransferMatrix allocates 16+ Complex objects per multiply** | Memory pressure during optimization | Inline complex arithmetic or use object pooling |
+
+**Details on Complex class performance:**
+
+The `Complex` class in `src/core/math/complex.ts` is immutable - every operation creates a new object:
+```typescript
+// Current: creates 4 intermediate Complex objects
+result = a.multiply(b).add(c.multiply(d));
+
+// Each TransferMatrix.multiply() does this 8 times = 16+ objects per call
+```
+
+During optimization, millions of transfer matrix calculations occur. Java's mutable approach reuses objects, while our immutable approach triggers garbage collection overhead.
+
+**Potential solutions (not yet implemented):**
+1. Add mutable operations: `a.multiplyInPlace(b).addInPlace(c.multiplyInPlace(d))`
+2. Use flat arrays: `[re, im]` instead of `new Complex(re, im)`
+3. Object pooling: Reuse Complex objects from a fixed pool
+
 ---
 
 ## Architecture
