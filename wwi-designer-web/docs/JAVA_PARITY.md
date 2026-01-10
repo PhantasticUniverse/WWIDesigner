@@ -788,6 +788,6 @@ The following Java components are not yet implemented as they are rarely used:
 
 ---
 
-*Document generated: 2026-01-08*
+*Document generated: 2026-01-10*
 *TypeScript version: 810 tests passing*
 *Java reference: WWIDesigner 1.x*

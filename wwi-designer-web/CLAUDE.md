@@ -42,7 +42,7 @@
 
 **CMA-ES eigendecomposition (not yet implemented):**
 
-The CMA-ES optimizer (`src/core/optimization/cmaes-optimizer.ts` lines 279-284) uses a simplified approach:
+The CMA-ES optimizer (`src/core/optimization/cmaes-optimizer.ts` lines 279-283) uses a simplified approach:
 - B matrix stays identity (never updated)
 - Eigenvalues extracted from diagonal only
 
