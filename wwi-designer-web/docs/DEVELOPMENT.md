@@ -35,7 +35,11 @@ wwi-designer-web/
 │   ├── models/             # Data interfaces (Instrument, Tuning)
 │   ├── utils/              # XML converter, helpers
 │   └── web/                # Server and frontend
-├── tests/                  # Test files (mirrors src/ structure)
+├── tests/
+│   ├── core/               # Unit tests (mirrors src/core/)
+│   ├── parity/             # Java comparison tests
+│   ├── web/                # API endpoint tests
+│   └── e2e/                # Playwright browser tests (.e2e.ts)
 ├── docs/                   # Theory and API documentation
 └── sample-instruments/     # Test instrument XML files
 ```
@@ -165,10 +169,10 @@ function processValue(value: string | number) {
 
 ## Testing
 
-### Running Tests
+### Unit Tests (bun test)
 
 ```bash
-# All tests
+# All unit tests
 bun test
 
 # Watch mode
@@ -183,6 +187,21 @@ bun test --grep "BOBYQA"
 # Specific directory
 bun test tests/parity/
 ```
+
+### E2E Tests (Playwright)
+
+```bash
+# Run all E2E tests (headless)
+bun run test:e2e
+
+# Run with Playwright UI
+bun run test:e2e:ui
+
+# Run in debug mode
+bun run test:e2e:debug
+```
+
+E2E tests use `.e2e.ts` extension (not `.spec.ts`) to avoid conflicts with `bun test`.
 
 ### Test Structure
 
@@ -215,6 +234,7 @@ describe("ComponentName", () => {
 | Unit | `tests/core/` | Individual component tests |
 | Parity | `tests/parity/` | Java comparison tests |
 | Integration | `tests/web/` | API endpoint tests |
+| E2E | `tests/e2e/` | Browser-based workflow tests (Playwright) |
 
 ## Code Style
 

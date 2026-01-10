@@ -105,6 +105,12 @@ src/
     ├── server.ts                 # Bun.serve API endpoints
     └── frontend.ts               # Web UI (instrument editor, visualization)
 
+tests/
+├── core/                         # Unit tests (mirrors src/core/)
+├── parity/                       # Java comparison tests
+├── web/                          # API endpoint tests
+└── e2e/                          # Playwright browser tests (.e2e.ts)
+
 presets/
 └── NAF/                          # Native American Flute presets (67 files)
     ├── instruments/              # 25 starter instruments (various bore sizes)
@@ -176,12 +182,24 @@ Organized by category:
 
 ## Testing
 
+### Unit Tests
+
 ```bash
-bun test                           # Run all 810 tests
+bun test                           # Run all 810 unit tests
 bun test --watch                   # Watch mode
 bun test tests/parity/             # Java comparison tests only
 bun test tests/core/optimization/  # Optimization tests only
 ```
+
+### E2E Tests (Playwright)
+
+```bash
+bun run test:e2e                   # Run all E2E tests (headless)
+bun run test:e2e:ui                # Run with Playwright UI
+bun run test:e2e:debug             # Run in debug mode
+```
+
+E2E tests use `.e2e.ts` extension (not `.spec.ts`) to avoid conflicts with `bun test`.
 
 ### Test Categories
 
@@ -197,6 +215,7 @@ bun test tests/core/optimization/  # Optimization tests only
 | Multi-start | 15 | Range processors |
 | Two-stage | 11 | Evaluator switching |
 | Server API | 15 | Web endpoints |
+| E2E (Playwright) | 12 | Browser-based workflow tests |
 
 ### Parity Verification
 
@@ -335,6 +354,8 @@ Server runs at http://localhost:3000
 |------|---------|
 | `src/web/server.ts` | Bun.serve API endpoints |
 | `src/web/frontend.ts` | Instrument/tuning editors, visualization |
+| `playwright.config.ts` | E2E test configuration |
+| `tests/e2e/*.e2e.ts` | Playwright browser tests |
 
 ---
 
