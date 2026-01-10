@@ -165,27 +165,63 @@
           <!-- Welcome Panel -->
           <div class="tab-panel active" id="panel-welcome">
             <div class="welcome-content">
-              <h2>Welcome to WWIDesigner</h2>
-              <p>Woodwind Instrument Designer - Web Edition</p>
+              <div class="welcome-hero">
+                <h2>Welcome to WWIDesigner</h2>
+                <p class="tagline">Woodwind Instrument Designer - Web Edition</p>
+                <p class="hero-subtitle">Craft Your Sound</p>
+              </div>
               <div class="quick-actions">
                 <button class="quick-action" data-action="new-instrument">
-                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  <!-- Stylized flute/NAF icon -->
+                  <svg viewBox="0 0 48 48" width="48" height="48">
+                    <rect x="4" y="20" width="40" height="8" rx="4" fill="currentColor" opacity="0.3"/>
+                    <rect x="6" y="21" width="36" height="6" rx="3" fill="currentColor"/>
+                    <circle cx="14" cy="24" r="2" fill="var(--bg-primary)"/>
+                    <circle cx="22" cy="24" r="2" fill="var(--bg-primary)"/>
+                    <circle cx="30" cy="24" r="2" fill="var(--bg-primary)"/>
+                    <circle cx="38" cy="24" r="1.5" fill="var(--bg-primary)"/>
+                    <path d="M24 16 L24 12 M24 36 L24 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+                  </svg>
                   <span>New Instrument</span>
                 </button>
                 <button class="quick-action" data-action="load-sample">
-                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                  <!-- Sample/preset icon with flute silhouette -->
+                  <svg viewBox="0 0 48 48" width="48" height="48">
+                    <path d="M24 6 L24 26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M16 18 L24 26 L32 18" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <rect x="8" y="34" width="32" height="6" rx="2" fill="currentColor" opacity="0.5"/>
+                    <circle cx="16" cy="37" r="1.5" fill="var(--bg-primary)"/>
+                    <circle cx="24" cy="37" r="1.5" fill="var(--bg-primary)"/>
+                    <circle cx="32" cy="37" r="1.5" fill="var(--bg-primary)"/>
+                  </svg>
                   <span>Load Sample</span>
                 </button>
                 <button class="quick-action" data-action="open-instrument">
-                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                  <!-- Folder with wood grain hint -->
+                  <svg viewBox="0 0 48 48" width="48" height="48">
+                    <path d="M8 12 L18 12 L22 8 L40 8 L40 38 L8 38 Z" fill="currentColor" opacity="0.3"/>
+                    <path d="M10 14 L18 14 L21 11 L38 11 L38 36 L10 36 Z" fill="currentColor"/>
+                    <path d="M12 18 L36 18 M12 24 L36 24 M12 30 L36 30" stroke="var(--bg-primary)" stroke-width="1" opacity="0.3"/>
+                  </svg>
                   <span>Open Instrument</span>
                 </button>
                 <button class="quick-action" data-action="open-tuning">
-                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                  <!-- Tuning fork icon -->
+                  <svg viewBox="0 0 48 48" width="48" height="48">
+                    <path d="M18 8 L18 24 Q18 28 24 28 Q30 28 30 24 L30 8" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M24 28 L24 42" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="24" cy="42" r="3" fill="currentColor" opacity="0.5"/>
+                  </svg>
                   <span>Open Tuning</span>
                 </button>
                 <button class="quick-action" data-action="open-constraints">
-                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                  <!-- Caliper/measurement icon -->
+                  <svg viewBox="0 0 48 48" width="48" height="48">
+                    <path d="M8 12 L8 36 L12 36 L12 20 L20 20 L20 36 L24 36 L24 12 Z" fill="currentColor" opacity="0.5"/>
+                    <path d="M28 12 L28 36 L32 36 L32 20 L36 20 L36 36 L40 36 L40 12 Z" fill="currentColor"/>
+                    <path d="M14 16 L14 8 M38 16 L38 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M14 8 L38 8" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/>
+                  </svg>
                   <span>Open Constraints</span>
                 </button>
               </div>
@@ -254,6 +290,15 @@
         </div>
       </div>
     </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-spinner"></div>
+      <div class="loading-message" id="loading-message">Processing...</div>
+    </div>
+
+    <!-- Toast notifications container -->
+    <div class="toast-container" id="toast-container"></div>
   </div>
 
   <script type="module" src="./frontend.ts"></script>

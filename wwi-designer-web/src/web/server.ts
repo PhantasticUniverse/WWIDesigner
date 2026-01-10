@@ -32,6 +32,8 @@ import {
   parseConstraints,
   constraintsToXml,
   constraintsToJson,
+  parseInstrument,
+  parseTuning,
 } from "../utils/xml-converter.ts";
 import type { Instrument } from "../models/instrument.ts";
 import { convertInstrumentFromMetres, validateInstrument } from "../models/instrument.ts";
@@ -841,6 +843,221 @@ function handleListObjectiveFunctions(): Response {
 }
 
 // ============================================================================
+// Presets API Handlers
+// ============================================================================
+
+interface PresetInfo {
+  name: string;
+  filename: string;
+  path: string;
+}
+
+interface ConstraintGroup {
+  objectiveFunction: string;
+  displayName: string;
+  presets: PresetInfo[];
+}
+
+// Human-readable names for objective function types
+const OBJECTIVE_FUNCTION_DISPLAY_NAMES: Record<string, string> = {
+  "FippleFactorObjectiveFunction": "Fipple Factor",
+  "HoleFromTopObjectiveFunction": "Hole Position",
+  "HoleGroupFromTopObjectiveFunction": "Hole Groups",
+  "NafHoleSizeObjectiveFunction": "Hole Size",
+  "SingleTaperHoleGroupFromTopHemiHeadObjectiveFunction": "Taper + Groups (Hemi-Head)",
+  "SingleTaperHoleGroupFromTopObjectiveFunction": "Taper + Hole Groups",
+  "SingleTaperNoHoleGroupingFromTopHemiHeadObjectiveFunction": "Taper (Hemi-Head)",
+  "SingleTaperNoHoleGroupingFromTopObjectiveFunction": "Taper (No Grouping)",
+};
+
+const VALID_PRESET_CATEGORIES = [
+  "instruments",
+  "tunings",
+  "constraints",
+  "scales",
+  "temperaments",
+  "fingerings",
+  "symbols",
+] as const;
+
+type PresetCategory = (typeof VALID_PRESET_CATEGORIES)[number];
+
+/**
+ * List available presets for a category.
+ * GET /api/presets/:category
+ * Returns: { category, presets: [{ name, filename, path }] }
+ * For constraints: { category, groups: [{ objectiveFunction, displayName, presets }] }
+ */
+async function handleListPresets(req: Request): Promise<Response> {
+  try {
+    const rateCheck = checkRateLimit(req, "/api/presets");
+    if (!rateCheck.allowed) {
+      return rateLimitedResponse(rateCheck.retryAfter!);
+    }
+
+    const url = new URL(req.url);
+    const pathParts = url.pathname.split("/");
+    const category = pathParts[pathParts.length - 1] as PresetCategory;
+
+    if (!VALID_PRESET_CATEGORIES.includes(category)) {
+      return createErrorResponse(
+        `Invalid category: ${category}. Valid categories: ${VALID_PRESET_CATEGORIES.join(", ")}`,
+        400,
+        "INVALID_CATEGORY"
+      );
+    }
+
+    const presetsDir = `./presets/NAF/${category}`;
+
+    // Special handling for constraints: group by objective function subdirectory
+    if (category === "constraints") {
+      const groups: ConstraintGroup[] = [];
+      const groupMap = new Map<string, PresetInfo[]>();
+
+      try {
+        const glob = new Bun.Glob("**/*.xml");
+        for await (const file of glob.scan(presetsDir)) {
+          const parts = file.split("/");
+          // First part is the objective function directory
+          const objectiveFunction = parts.length > 1 ? parts[0]! : "Other";
+          const filename = parts[parts.length - 1] || file;
+          const name = filename.replace(".xml", "");
+
+          if (!groupMap.has(objectiveFunction)) {
+            groupMap.set(objectiveFunction, []);
+          }
+          groupMap.get(objectiveFunction)!.push({
+            name,
+            filename,
+            path: `${category}/${file}`,
+          });
+        }
+      } catch (scanError) {
+        console.error(`Error scanning presets/${category}:`, scanError);
+      }
+
+      // Convert map to sorted groups
+      for (const [objectiveFunction, presets] of groupMap) {
+        presets.sort((a, b) => a.name.localeCompare(b.name));
+        groups.push({
+          objectiveFunction,
+          displayName: OBJECTIVE_FUNCTION_DISPLAY_NAMES[objectiveFunction] || objectiveFunction,
+          presets,
+        });
+      }
+
+      // Sort groups by display name
+      groups.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+      return Response.json({ category, groups });
+    }
+
+    // Standard flat list for other categories
+    const presets: PresetInfo[] = [];
+
+    try {
+      const glob = new Bun.Glob("**/*.xml");
+      for await (const file of glob.scan(presetsDir)) {
+        const filename = file.split("/").pop() || file;
+        const name = filename.replace(".xml", "");
+        presets.push({
+          name,
+          filename,
+          path: `${category}/${file}`,
+        });
+      }
+    } catch (scanError) {
+      // Directory might not exist or be empty
+      console.error(`Error scanning presets/${category}:`, scanError);
+    }
+
+    // Sort by name for consistent ordering
+    presets.sort((a, b) => a.name.localeCompare(b.name));
+
+    return Response.json({ category, presets });
+  } catch (error) {
+    return createErrorResponse(sanitizeError(error), 500, "INTERNAL_ERROR");
+  }
+}
+
+/**
+ * Load and parse a specific preset file.
+ * GET /api/presets/:category/:path
+ * Returns parsed JSON for instruments/tunings/constraints, raw XML for others.
+ */
+async function handleGetPreset(req: Request): Promise<Response> {
+  try {
+    const rateCheck = checkRateLimit(req, "/api/presets");
+    if (!rateCheck.allowed) {
+      return rateLimitedResponse(rateCheck.retryAfter!);
+    }
+
+    const url = new URL(req.url);
+    // Extract path after /api/presets/
+    const pathMatch = url.pathname.match(/\/api\/presets\/(.+)/);
+    if (!pathMatch || !pathMatch[1]) {
+      return createErrorResponse("Invalid preset path", 400, "INVALID_PATH");
+    }
+
+    const relativePath = pathMatch[1];
+
+    // Security: Validate path doesn't escape presets directory
+    if (relativePath.includes("..")) {
+      return createErrorResponse("Invalid preset path", 400, "INVALID_PATH");
+    }
+
+    if (!relativePath.endsWith(".xml")) {
+      return createErrorResponse("Preset must be an XML file", 400, "INVALID_PATH");
+    }
+
+    const presetPath = `./presets/NAF/${relativePath}`;
+    const category = relativePath.split("/")[0];
+
+    try {
+      const file = Bun.file(presetPath);
+      const exists = await file.exists();
+      if (!exists) {
+        return createErrorResponse("Preset not found", 404, "NOT_FOUND");
+      }
+
+      const content = await file.text();
+
+      // Parse based on category to return structured JSON
+      if (category === "instruments") {
+        const instrument = parseInstrument(content);
+        return Response.json(instrument);
+      } else if (category === "tunings") {
+        const tuning = parseTuning(content);
+        return Response.json(tuning);
+      } else if (category === "constraints") {
+        const constraints = parseConstraints(content);
+        return Response.json({
+          constraintsName: constraints.getConstraintsName(),
+          objectiveDisplayName: constraints.getObjectiveDisplayName(),
+          objectiveFunctionName: constraints.getObjectiveFunctionName(),
+          numberOfHoles: constraints.getNumberOfHoles(),
+          lengthType: constraints.getLengthType(),
+          constraints: constraints.getConstraints(),
+          lowerBounds: constraints.getLowerBounds(),
+          upperBounds: constraints.getUpperBounds(),
+          holeGroups: constraints.getHoleGroups(),
+        });
+      } else {
+        // For other categories (scales, temperaments, fingerings, symbols), return raw XML
+        return new Response(content, {
+          headers: { "Content-Type": "application/xml" },
+        });
+      }
+    } catch (readError) {
+      console.error(`Error reading preset ${presetPath}:`, readError);
+      return createErrorResponse("Failed to read preset", 500, "READ_ERROR");
+    }
+  } catch (error) {
+    return createErrorResponse(sanitizeError(error), 500, "INTERNAL_ERROR");
+  }
+}
+
+// ============================================================================
 // Session Handlers with Rate Limiting
 // ============================================================================
 
@@ -957,6 +1174,13 @@ const server = Bun.serve({
       }
       else if (url.pathname === "/api/constraints/objective-functions" && req.method === "GET") {
         response = handleListObjectiveFunctions();
+      }
+      // Presets API
+      else if (url.pathname.match(/^\/api\/presets\/[a-z]+$/) && req.method === "GET") {
+        response = await handleListPresets(req);
+      }
+      else if (url.pathname.match(/^\/api\/presets\/.+\.xml$/) && req.method === "GET") {
+        response = await handleGetPreset(req);
       }
       else {
         response = createErrorResponse("Not found", 404, "NOT_FOUND");

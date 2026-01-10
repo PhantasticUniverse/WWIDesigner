@@ -26,6 +26,20 @@ interface ConstraintsData {
   dimensions?: number;
 }
 
+// Preset info from API
+interface PresetInfo {
+  name: string;
+  filename: string;
+  path: string;
+}
+
+// Constraint group (organized by objective function type)
+interface ConstraintGroup {
+  objectiveFunction: string;
+  displayName: string;
+  presets: PresetInfo[];
+}
+
 // Application State
 interface AppState {
   activeTab: string;
@@ -37,6 +51,13 @@ interface AppState {
   selectedConstraints: string | null;
   selectedOptimizer: string;
   selectedMultistart: string;
+  // Preset browser state
+  presetInstruments: PresetInfo[];
+  presetTunings: PresetInfo[];
+  presetConstraintGroups: ConstraintGroup[];
+  presetsLoaded: boolean;
+  presetsExpanded: { instruments: boolean; tunings: boolean; constraints: boolean };
+  constraintGroupsExpanded: Record<string, boolean>;
   preferences: {
     temperature: number;
     humidity: number;
@@ -64,6 +85,13 @@ const state: AppState = {
   selectedConstraints: null,
   selectedOptimizer: "HolePositionObjectiveFunction",
   selectedMultistart: "none",
+  // Preset browser state
+  presetInstruments: [],
+  presetTunings: [],
+  presetConstraintGroups: [],
+  presetsLoaded: false,
+  presetsExpanded: { instruments: false, tunings: false, constraints: false },
+  constraintGroupsExpanded: {},
   preferences: {
     temperature: 20,
     humidity: 45,
@@ -157,6 +185,126 @@ function log(message: string, level: "info" | "success" | "warning" | "error" = 
   entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   console.appendChild(entry);
   console.scrollTop = console.scrollHeight;
+}
+
+// Loading overlay
+function showLoading(message: string = "Processing...") {
+  const overlay = $("#loading-overlay");
+  const msgEl = $("#loading-message");
+  if (overlay && msgEl) {
+    msgEl.textContent = message;
+    overlay.classList.add("active");
+  }
+}
+
+function hideLoading() {
+  $("#loading-overlay")?.classList.remove("active");
+}
+
+// Toast notifications
+function showToast(message: string, type: "info" | "success" | "warning" | "error" = "info", duration = 5000) {
+  const container = $("#toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+
+  const text = document.createElement("span");
+  text.textContent = message;
+  toast.appendChild(text);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "toast-close";
+  closeBtn.textContent = "\u00D7";
+  closeBtn.addEventListener("click", () => toast.remove());
+  toast.appendChild(closeBtn);
+
+  container.appendChild(toast);
+
+  // Auto-remove after duration
+  setTimeout(() => {
+    toast.remove();
+  }, duration);
+}
+
+// Keyboard shortcuts
+function initKeyboardShortcuts() {
+  document.addEventListener("keydown", (e) => {
+    // Escape = Close modal
+    if (e.key === "Escape") {
+      $("#modal-overlay")?.classList.remove("open");
+      $("#about-modal")?.classList.remove("open");
+    }
+
+    // Ctrl/Cmd + S = Save (prevent default)
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      log("Save shortcut pressed", "info");
+      // TODO: Implement save
+    }
+
+    // Ctrl/Cmd + O = Open
+    if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+      e.preventDefault();
+      // Trigger file import
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = ".xml";
+      fileInput.addEventListener("change", (ev) => {
+        const target = ev.target as HTMLInputElement;
+        if (target.files && target.files.length > 0) {
+          const file = target.files[0]!;
+          handleFileImport(file);
+        }
+      });
+      fileInput.click();
+    }
+
+    // Ctrl/Cmd + Shift + C = Calculate tuning
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") {
+      e.preventDefault();
+      if (state.selectedInstrument && state.selectedTuning) {
+        calculateTuning(state.selectedInstrument, state.selectedTuning);
+      } else {
+        showToast("Please select an instrument and tuning first", "warning");
+      }
+    }
+  });
+}
+
+// File import handler for keyboard shortcut
+async function handleFileImport(file: File) {
+  try {
+    const content = await file.text();
+    const parsed = parseInstrument(content);
+    if (parsed) {
+      const id = `imported-${Date.now()}`;
+      state.instruments.set(id, parsed);
+      state.selectedInstrument = id;
+      updateSidebar();
+      createInstrumentEditor(parsed, id);
+      log(`Imported instrument: ${parsed.name || "Untitled"}`, "success");
+      showToast(`Imported: ${parsed.name || "Untitled"}`, "success");
+    }
+  } catch {
+    // Try as tuning
+    try {
+      const content = await file.text();
+      const parsed = parseTuning(content);
+      if (parsed) {
+        const id = `imported-${Date.now()}`;
+        state.tunings.set(id, parsed);
+        state.selectedTuning = id;
+        updateSidebar();
+        createTuningEditor(parsed, id);
+        log(`Imported tuning: ${parsed.name || "Untitled"}`, "success");
+        showToast(`Imported: ${parsed.name || "Untitled"}`, "success");
+      }
+    } catch (err) {
+      log(`Failed to import file: ${err}`, "error");
+      showToast("Failed to import file", "error");
+    }
+  }
 }
 
 // Tab Management
@@ -875,20 +1023,24 @@ function showTuningResults(results: any[], instrumentName: string, tuningName: s
           ${results
             .map((r) => {
               const dev = r.deviationCents || 0;
+              const absDev = Math.abs(dev);
+              // Color based on how far from 0 (absolute deviation), not positive/negative
               const devClass =
-                Math.abs(dev) < 5
+                absDev < 5
                   ? "deviation-good"
-                  : dev > 0
-                    ? "deviation-positive"
-                    : "deviation-negative";
-              const status = Math.abs(dev) < 5 ? "Good" : Math.abs(dev) < 15 ? "Fair" : "Poor";
+                  : absDev < 15
+                    ? "deviation-fair"
+                    : "deviation-poor";
+              const status = absDev < 5 ? "Good" : absDev < 15 ? "Fair" : "Poor";
+              const statusClass = absDev < 5 ? "status-good" : absDev < 15 ? "status-fair" : "status-poor";
+              const rowClass = absDev < 5 ? "row-good" : absDev < 15 ? "row-fair" : "row-poor";
               return `
-              <tr>
+              <tr class="${rowClass}">
                 <td>${r.note}</td>
                 <td>${r.targetFrequency?.toFixed(1) || "-"}</td>
                 <td>${r.predictedFrequency?.toFixed(1) || "-"}</td>
                 <td class="${devClass}">${dev.toFixed(1)}</td>
-                <td>${status}</td>
+                <td class="${statusClass}">${status}</td>
               </tr>
             `;
             })
@@ -933,18 +1085,18 @@ function drawInstrument(instrument: Instrument, canvasId: string) {
 
   const width = canvas.width;
   const height = canvas.height;
-  const padding = 40;
+  const padding = 50;
 
-  // Clear
-  ctx.fillStyle = "#ffffff";
+  // Clear with warm cream background
+  ctx.fillStyle = "#faf6f0";
   ctx.fillRect(0, 0, width, height);
 
   const borePoints = instrument.borePoint || [];
   const holes = instrument.hole || [];
 
   if (borePoints.length < 2) {
-    ctx.fillStyle = "#666";
-    ctx.font = "14px sans-serif";
+    ctx.fillStyle = "#6b4423";
+    ctx.font = "14px 'Source Sans 3', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Insufficient bore data", width / 2, height / 2);
     return;
@@ -956,77 +1108,257 @@ function drawInstrument(instrument: Instrument, canvasId: string) {
   const maxDia = Math.max(...borePoints.map((p) => p.boreDiameter));
 
   const lengthScale = (width - 2 * padding) / (maxPos - minPos || 1);
-  const diaScale = (height - 2 * padding) / (maxDia * 2);
+  const diaScale = (height - 2 * padding - 40) / (maxDia * 2.5);
   const scale = Math.min(lengthScale, diaScale);
 
-  const centerY = height / 2;
+  const centerY = height / 2 + 10;
 
   // Helper to convert position to x coordinate
   const posToX = (pos: number) => padding + (pos - minPos) * scale;
   const diaToY = (dia: number) => (dia / 2) * scale;
 
-  // Draw bore profile (top and bottom)
-  ctx.beginPath();
-  ctx.strokeStyle = "#333";
-  ctx.lineWidth = 2;
+  // TOP-DOWN VIEW: Draw bore as elongated shape with rounded ends
+  const lastBp = borePoints[borePoints.length - 1]!;
+  const firstBp = borePoints[0]!;
 
-  // Top profile
-  ctx.moveTo(posToX(borePoints[0]!.borePosition), centerY - diaToY(borePoints[0]!.boreDiameter));
+  // Create bore path for clipping (top-down view)
+  ctx.save();
+  ctx.beginPath();
+
+  // Draw top edge following bore profile
+  ctx.moveTo(posToX(firstBp.borePosition), centerY - diaToY(firstBp.boreDiameter));
   for (const bp of borePoints) {
     ctx.lineTo(posToX(bp.borePosition), centerY - diaToY(bp.boreDiameter));
   }
 
-  // Connect to bottom
-  const lastBp = borePoints[borePoints.length - 1]!;
-  ctx.lineTo(posToX(lastBp.borePosition), centerY + diaToY(lastBp.boreDiameter));
+  // Rounded end cap on right
+  const rightRadius = diaToY(lastBp.boreDiameter);
+  ctx.arc(posToX(lastBp.borePosition), centerY, rightRadius, -Math.PI / 2, Math.PI / 2);
 
-  // Bottom profile (reverse)
+  // Draw bottom edge (reverse)
   for (let i = borePoints.length - 1; i >= 0; i--) {
     const bp = borePoints[i]!;
     ctx.lineTo(posToX(bp.borePosition), centerY + diaToY(bp.boreDiameter));
   }
 
+  // Rounded end cap on left (or square for TSH area)
+  const leftRadius = diaToY(firstBp.boreDiameter);
+  ctx.arc(posToX(firstBp.borePosition), centerY, leftRadius, Math.PI / 2, -Math.PI / 2);
+
   ctx.closePath();
-  ctx.fillStyle = "#e8d5b0";
+
+  // Wood gradient fill (top-down lighting)
+  const boreTop = centerY - diaToY(maxDia);
+  const boreBottom = centerY + diaToY(maxDia);
+  const woodGradient = ctx.createLinearGradient(0, boreTop, 0, boreBottom);
+  woodGradient.addColorStop(0, "#c49464");    // Top highlight
+  woodGradient.addColorStop(0.2, "#a67c52");  // Light wood
+  woodGradient.addColorStop(0.5, "#8b5a2b");  // Main wood color
+  woodGradient.addColorStop(0.8, "#a67c52");  // Light wood
+  woodGradient.addColorStop(1, "#c49464");    // Bottom highlight
+
+  ctx.fillStyle = woodGradient;
   ctx.fill();
+
+  // Procedural wood grain within bore
+  ctx.clip();
+  drawWoodGrain(ctx, posToX(minPos) - leftRadius, boreTop, posToX(maxPos) - posToX(minPos) + leftRadius + rightRadius, boreBottom - boreTop);
+  ctx.restore();
+
+  // Bore outline with subtle shadow
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 3;
+
+  ctx.beginPath();
+  ctx.moveTo(posToX(firstBp.borePosition), centerY - diaToY(firstBp.boreDiameter));
+  for (const bp of borePoints) {
+    ctx.lineTo(posToX(bp.borePosition), centerY - diaToY(bp.boreDiameter));
+  }
+  ctx.arc(posToX(lastBp.borePosition), centerY, rightRadius, -Math.PI / 2, Math.PI / 2);
+  for (let i = borePoints.length - 1; i >= 0; i--) {
+    const bp = borePoints[i]!;
+    ctx.lineTo(posToX(bp.borePosition), centerY + diaToY(bp.boreDiameter));
+  }
+  ctx.arc(posToX(firstBp.borePosition), centerY, leftRadius, Math.PI / 2, -Math.PI / 2);
+  ctx.closePath();
+
+  ctx.strokeStyle = "#5a3d20";
+  ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.restore();
 
-  // Draw holes
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#333";
-  ctx.lineWidth = 1.5;
-
+  // Draw 3D tone holes (centered on bore - top-down view)
   for (const hole of holes) {
     const x = posToX(hole.position);
-    const holeRadius = (hole.diameter / 2) * scale;
+    const holeRadius = Math.max((hole.diameter / 2) * scale, 5);
+    draw3DToneHole(ctx, x, centerY, holeRadius);
+  }
 
-    // Draw hole on top
+  // Draw TSH (True Sound Hole) on centerline
+  drawMouthpiece(ctx, instrument, posToX, diaToY, centerY, scale, borePoints);
+
+  // Draw dimension annotations
+  drawDimensions(ctx, instrument, posToX, diaToY, centerY, scale, minPos, maxPos, padding, height);
+
+  // Title with craftsman styling
+  ctx.fillStyle = "#4a2f15";
+  ctx.font = "600 15px 'Playfair Display', Georgia, serif";
+  ctx.textAlign = "left";
+  const lengthVal = (maxPos - minPos).toFixed(2);
+  ctx.fillText(`Length: ${lengthVal}`, padding, 24);
+  ctx.fillText(`Holes: ${holes.length}`, padding + 160, 24);
+}
+
+// Procedural wood grain rendering
+function drawWoodGrain(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = "#3d2815";
+  ctx.lineWidth = 0.6;
+
+  // Draw wavy grain lines
+  const grainSpacing = 2.5;
+  for (let i = 0; i < height; i += grainSpacing + Math.random() * 1.5) {
     ctx.beginPath();
-    ctx.arc(x, centerY - diaToY(getBoreDiameterAtPosition(borePoints, hole.position)), holeRadius, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(x, y + i);
+    for (let j = 0; j < width; j += 8) {
+      const wave = Math.sin((j + i * 0.3) * 0.015) * 1.2 + Math.sin((j * 0.05) + i * 0.1) * 0.5;
+      ctx.lineTo(x + j, y + i + wave);
+    }
     ctx.stroke();
   }
 
-  // Draw position markers
-  ctx.fillStyle = "#666";
-  ctx.font = "10px sans-serif";
-  ctx.textAlign = "center";
-
-  // Bore point markers
-  for (const bp of borePoints) {
-    const x = posToX(bp.borePosition);
-    ctx.fillText(`${bp.borePosition}`, x, height - 10);
+  // Add occasional knot patterns
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = "#2d1a0a";
+  const knotCount = Math.floor(width / 150);
+  for (let k = 0; k < knotCount; k++) {
+    const kx = x + 80 + Math.random() * (width - 160);
+    const ky = y + height * 0.3 + Math.random() * height * 0.4;
+    const kRadius = 3 + Math.random() * 4;
+    ctx.beginPath();
+    ctx.ellipse(kx, ky, kRadius, kRadius * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // Draw mouthpiece
-  drawMouthpiece(ctx, instrument, posToX, diaToY, centerY, scale);
+  ctx.restore();
+}
 
-  // Title
-  ctx.fillStyle = "#333";
-  ctx.font = "14px sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(`Length: ${maxPos - minPos} mm`, padding, 20);
-  ctx.fillText(`Holes: ${holes.length}`, padding + 150, 20);
+// 3D tone hole with depth effect (top-down view - circular)
+function draw3DToneHole(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+  // Outer raised rim (wood edge) - shadow
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = "#6b4423";
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Wood rim ring
+  ctx.fillStyle = "#8b5a2b";
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 1.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner hole (dark void with gradient)
+  const holeGradient = ctx.createRadialGradient(x - radius * 0.2, y - radius * 0.2, 0, x, y, radius);
+  holeGradient.addColorStop(0, "#0a0806");
+  holeGradient.addColorStop(0.4, "#1a1410");
+  holeGradient.addColorStop(0.7, "#2d2520");
+  holeGradient.addColorStop(1, "#1a1410");
+
+  ctx.fillStyle = holeGradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Highlight rim on top-left edge
+  ctx.strokeStyle = "rgba(212, 165, 116, 0.5)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.95, Math.PI * 1.1, Math.PI * 1.7);
+  ctx.stroke();
+
+  // Inner edge highlight
+  ctx.strokeStyle = "rgba(212, 165, 116, 0.2)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.7, Math.PI * 1.2, Math.PI * 1.6);
+  ctx.stroke();
+}
+
+// Dimension annotations like technical drawings
+function drawDimensions(
+  ctx: CanvasRenderingContext2D,
+  instrument: Instrument,
+  posToX: (pos: number) => number,
+  diaToY: (dia: number) => number,
+  centerY: number,
+  scale: number,
+  minPos: number,
+  maxPos: number,
+  padding: number,
+  height: number
+) {
+  const borePoints = instrument.borePoint || [];
+  const maxDia = Math.max(...borePoints.map((p) => p.boreDiameter));
+
+  // Dimension line color (copper/brass)
+  ctx.strokeStyle = "#8b6b4a";
+  ctx.fillStyle = "#6b4423";
+  ctx.font = "11px 'JetBrains Mono', monospace";
+
+  // Total length dimension line at bottom
+  const dimY = centerY + diaToY(maxDia) + 25;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(posToX(minPos), dimY);
+  ctx.lineTo(posToX(maxPos), dimY);
+  ctx.stroke();
+
+  // Extension lines
+  ctx.beginPath();
+  ctx.moveTo(posToX(minPos), centerY + diaToY(maxDia) + 5);
+  ctx.lineTo(posToX(minPos), dimY + 5);
+  ctx.moveTo(posToX(maxPos), centerY + diaToY(maxDia) + 5);
+  ctx.lineTo(posToX(maxPos), dimY + 5);
+  ctx.stroke();
+
+  // Arrowheads
+  const arrowSize = 5;
+  ctx.beginPath();
+  ctx.moveTo(posToX(minPos), dimY);
+  ctx.lineTo(posToX(minPos) + arrowSize, dimY - 3);
+  ctx.lineTo(posToX(minPos) + arrowSize, dimY + 3);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(posToX(maxPos), dimY);
+  ctx.lineTo(posToX(maxPos) - arrowSize, dimY - 3);
+  ctx.lineTo(posToX(maxPos) - arrowSize, dimY + 3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Bore diameter indicator on right side
+  if (borePoints.length > 0) {
+    const rightDia = borePoints[borePoints.length - 1]!.boreDiameter;
+    const rightX = posToX(maxPos) + 15;
+    ctx.beginPath();
+    ctx.moveTo(rightX, centerY - diaToY(rightDia));
+    ctx.lineTo(rightX, centerY + diaToY(rightDia));
+    ctx.stroke();
+
+    // Diameter text
+    ctx.textAlign = "left";
+    ctx.fillText(`⌀${rightDia.toFixed(2)}`, rightX + 5, centerY + 4);
+  }
 }
 
 function drawMouthpiece(
@@ -1035,58 +1367,61 @@ function drawMouthpiece(
   posToX: (pos: number) => number,
   diaToY: (dia: number) => number,
   centerY: number,
-  scale: number
+  scale: number,
+  borePoints: BorePoint[]
 ) {
   const mouthpiece = instrument.mouthpiece;
   if (!mouthpiece) return;
 
   const mpPos = mouthpiece.position;
+  const boreDia = borePoints.length > 0 ? borePoints[0]!.boreDiameter : 20;
+  const boreRadius = diaToY(boreDia);
 
-  // Draw fipple window as a rectangle
+  // Draw NAF fipple (True Sound Hole) with enhanced styling - centered for top-down view
   if (mouthpiece.fipple) {
     const fipple = mouthpiece.fipple;
     const windowLength = fipple.windowLength || 0;
     const windowWidth = fipple.windowWidth || 0;
 
     if (windowLength > 0 && windowWidth > 0) {
-      // Window rectangle (solid)
       const windowLeft = posToX(mpPos - windowLength);
       const windowRight = posToX(mpPos);
-      const halfWidth = (windowWidth / 2) * scale;
+      const halfWidth = Math.min((windowWidth / 2) * scale, boreRadius * 0.9);
+
+      // TSH (True Sound Hole) - dark opening with gradient (centered on bore)
+      const tshGradient = ctx.createRadialGradient(
+        (windowLeft + windowRight) / 2, centerY, 0,
+        (windowLeft + windowRight) / 2, centerY, Math.max(windowRight - windowLeft, halfWidth * 2) / 2
+      );
+      tshGradient.addColorStop(0, "#0a0806");
+      tshGradient.addColorStop(0.6, "#1a1410");
+      tshGradient.addColorStop(1, "#2d2520");
 
       ctx.beginPath();
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 2;
       ctx.moveTo(windowRight, centerY - halfWidth);
       ctx.lineTo(windowRight, centerY + halfWidth);
       ctx.lineTo(windowLeft, centerY + halfWidth);
       ctx.lineTo(windowLeft, centerY - halfWidth);
       ctx.closePath();
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = tshGradient;
       ctx.fill();
+
+      // TSH border with wood color
+      ctx.strokeStyle = "#5a3d20";
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Windway rectangle (dashed) if present
-      if (fipple.windwayLength && fipple.windwayLength > 0) {
-        const windwayExit = mpPos - windowLength;
-        const windwayLeft = posToX(windwayExit - fipple.windwayLength);
-        const windwayRight = posToX(windwayExit);
-
-        ctx.beginPath();
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([5, 2]);
-        ctx.moveTo(windwayLeft, centerY - halfWidth);
-        ctx.lineTo(windwayRight, centerY - halfWidth);
-        ctx.lineTo(windwayRight, centerY + halfWidth);
-        ctx.lineTo(windwayLeft, centerY + halfWidth);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      // Highlight on edges
+      ctx.strokeStyle = "rgba(212, 165, 116, 0.4)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(windowLeft + 2, centerY - halfWidth + 1);
+      ctx.lineTo(windowRight - 2, centerY - halfWidth + 1);
+      ctx.stroke();
     }
   }
 
-  // Draw embouchure hole as an oval
+  // Draw embouchure hole as an oval (for transverse flutes)
   if (mouthpiece.embouchureHole) {
     const emb = mouthpiece.embouchureHole;
     const embLength = emb.length || 0;
@@ -1097,12 +1432,25 @@ function drawMouthpiece(
       const radiusX = (embLength / 2) * scale;
       const radiusY = (embWidth / 2) * scale;
 
+      // Embouchure hole with 3D effect
+      const embGradient = ctx.createRadialGradient(cx, centerY - radiusY * 0.2, 0, cx, centerY, Math.max(radiusX, radiusY));
+      embGradient.addColorStop(0, "#0a0806");
+      embGradient.addColorStop(0.7, "#1a1410");
+      embGradient.addColorStop(1, "#2d2520");
+
       ctx.beginPath();
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 1.5;
-      ctx.ellipse(cx, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
+      ctx.ellipse(cx, centerY - boreRadius, radiusX, radiusY * 0.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = embGradient;
       ctx.fill();
+      ctx.strokeStyle = "#6b4423";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Highlight rim
+      ctx.strokeStyle = "rgba(212, 165, 116, 0.4)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(cx, centerY - boreRadius - 1, radiusX * 0.9, radiusY * 0.45, 0, Math.PI * 1.2, Math.PI * 1.8);
       ctx.stroke();
     }
   }
@@ -1327,6 +1675,130 @@ function createNewTuning() {
   log("Created new tuning", "info");
 }
 
+// ============================================================================
+// Preset Browser
+// ============================================================================
+
+/**
+ * Load list of presets for a category from the API.
+ */
+async function loadPresetList(category: "instruments" | "tunings" | "constraints"): Promise<PresetInfo[]> {
+  try {
+    const response = await fetch(`/api/presets/${category}`);
+    const data = await response.json();
+    if (data.error) {
+      log(`Failed to load ${category} presets: ${data.error}`, "error");
+      return [];
+    }
+    return data.presets || [];
+  } catch (error) {
+    log(`Failed to load ${category} presets: ${error}`, "error");
+    return [];
+  }
+}
+
+/**
+ * Load constraint groups (organized by objective function type).
+ */
+async function loadConstraintGroups(): Promise<ConstraintGroup[]> {
+  try {
+    const response = await fetch("/api/presets/constraints");
+    const data = await response.json();
+    if (data.error) {
+      log(`Failed to load constraint groups: ${data.error}`, "error");
+      return [];
+    }
+    return data.groups || [];
+  } catch (error) {
+    log(`Failed to load constraint groups: ${error}`, "error");
+    return [];
+  }
+}
+
+/**
+ * Load all preset lists on startup.
+ */
+async function loadAllPresets() {
+  log("Loading preset libraries...", "info");
+
+  try {
+    const [instruments, tunings, constraintGroups] = await Promise.all([
+      loadPresetList("instruments"),
+      loadPresetList("tunings"),
+      loadConstraintGroups(),
+    ]);
+
+    state.presetInstruments = instruments;
+    state.presetTunings = tunings;
+    state.presetConstraintGroups = constraintGroups;
+    state.presetsLoaded = true;
+
+    // Count total constraints
+    const totalConstraints = constraintGroups.reduce((sum, g) => sum + g.presets.length, 0);
+
+    log(`Loaded ${instruments.length} instruments, ${tunings.length} tunings, ${totalConstraints} constraints presets`, "success");
+    updateSidebar();
+  } catch (error) {
+    log(`Failed to load presets: ${error}`, "error");
+  }
+}
+
+/**
+ * Load a specific preset into the application.
+ */
+async function loadPreset(category: "instruments" | "tunings" | "constraints", path: string) {
+  try {
+    log(`Loading preset: ${path}...`, "info");
+    const response = await fetch(`/api/presets/${path}`);
+    const data = await response.json();
+
+    if (data.error) {
+      log(`Failed to load preset: ${data.error}`, "error");
+      return;
+    }
+
+    const id = `preset-${Date.now()}`;
+
+    if (category === "instruments") {
+      state.instruments.set(id, data as Instrument);
+      state.selectedInstrument = id;
+      updateSidebar();
+      createInstrumentEditor(data as Instrument, id);
+      log(`Loaded instrument preset: ${data.name}`, "success");
+    } else if (category === "tunings") {
+      state.tunings.set(id, data as Tuning);
+      state.selectedTuning = id;
+      updateSidebar();
+      createTuningEditor(data as Tuning, id);
+      log(`Loaded tuning preset: ${data.name}`, "success");
+    } else if (category === "constraints") {
+      state.constraints.set(id, data as ConstraintsData);
+      state.selectedConstraints = id;
+      updateSidebar();
+      createConstraintsEditor(data as ConstraintsData, id);
+      log(`Loaded constraints preset: ${data.constraintsName}`, "success");
+    }
+  } catch (error) {
+    log(`Failed to load preset: ${error}`, "error");
+  }
+}
+
+/**
+ * Toggle a preset folder's expanded state.
+ */
+function togglePresetFolder(category: "instruments" | "tunings" | "constraints") {
+  state.presetsExpanded[category] = !state.presetsExpanded[category];
+  updateSidebar();
+}
+
+/**
+ * Toggle a constraint group folder's expanded state.
+ */
+function toggleConstraintGroup(groupName: string) {
+  state.constraintGroupsExpanded[groupName] = !state.constraintGroupsExpanded[groupName];
+  updateSidebar();
+}
+
 // Sidebar
 function updateSidebar() {
   const instrumentsList = $("#instruments-list");
@@ -1335,6 +1807,52 @@ function updateSidebar() {
 
   if (instrumentsList) {
     instrumentsList.innerHTML = "";
+
+    // Add preset folder if presets are loaded
+    if (state.presetsLoaded && state.presetInstruments.length > 0) {
+      const presetFolder = document.createElement("li");
+      presetFolder.className = "preset-folder";
+      const toggle = document.createElement("span");
+      toggle.className = "folder-toggle";
+      toggle.textContent = state.presetsExpanded.instruments ? "\u25BC" : "\u25B6";
+      const label = document.createElement("span");
+      label.className = "folder-label";
+      label.textContent = `Presets (${state.presetInstruments.length})`;
+      presetFolder.appendChild(toggle);
+      presetFolder.appendChild(label);
+      presetFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        togglePresetFolder("instruments");
+      });
+      instrumentsList.appendChild(presetFolder);
+
+      // Add preset list (collapsible)
+      if (state.presetsExpanded.instruments) {
+        const presetList = document.createElement("ul");
+        presetList.className = "preset-list";
+        for (const preset of state.presetInstruments) {
+          const li = document.createElement("li");
+          li.textContent = preset.name;
+          li.className = "preset-item";
+          li.addEventListener("click", (e) => {
+            e.stopPropagation();
+            loadPreset("instruments", preset.path);
+          });
+          presetList.appendChild(li);
+        }
+        instrumentsList.appendChild(presetList);
+      }
+
+      // Separator
+      if (state.instruments.size > 0) {
+        const separator = document.createElement("li");
+        separator.className = "separator";
+        separator.textContent = "\u2500 Loaded \u2500";
+        instrumentsList.appendChild(separator);
+      }
+    }
+
+    // List loaded instruments
     state.instruments.forEach((inst, id) => {
       const li = document.createElement("li");
       li.textContent = inst.name || "Untitled";
@@ -1351,6 +1869,52 @@ function updateSidebar() {
 
   if (tuningsList) {
     tuningsList.innerHTML = "";
+
+    // Add preset folder if presets are loaded
+    if (state.presetsLoaded && state.presetTunings.length > 0) {
+      const presetFolder = document.createElement("li");
+      presetFolder.className = "preset-folder";
+      const toggle = document.createElement("span");
+      toggle.className = "folder-toggle";
+      toggle.textContent = state.presetsExpanded.tunings ? "\u25BC" : "\u25B6";
+      const label = document.createElement("span");
+      label.className = "folder-label";
+      label.textContent = `Presets (${state.presetTunings.length})`;
+      presetFolder.appendChild(toggle);
+      presetFolder.appendChild(label);
+      presetFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        togglePresetFolder("tunings");
+      });
+      tuningsList.appendChild(presetFolder);
+
+      // Add preset list (collapsible)
+      if (state.presetsExpanded.tunings) {
+        const presetList = document.createElement("ul");
+        presetList.className = "preset-list";
+        for (const preset of state.presetTunings) {
+          const li = document.createElement("li");
+          li.textContent = preset.name;
+          li.className = "preset-item";
+          li.addEventListener("click", (e) => {
+            e.stopPropagation();
+            loadPreset("tunings", preset.path);
+          });
+          presetList.appendChild(li);
+        }
+        tuningsList.appendChild(presetList);
+      }
+
+      // Separator
+      if (state.tunings.size > 0) {
+        const separator = document.createElement("li");
+        separator.className = "separator";
+        separator.textContent = "\u2500 Loaded \u2500";
+        tuningsList.appendChild(separator);
+      }
+    }
+
+    // List loaded tunings
     state.tunings.forEach((tuning, id) => {
       const li = document.createElement("li");
       li.textContent = tuning.name || "Untitled";
@@ -1367,6 +1931,77 @@ function updateSidebar() {
 
   if (constraintsList) {
     constraintsList.innerHTML = "";
+
+    // Add preset groups organized by objective function type
+    if (state.presetsLoaded && state.presetConstraintGroups.length > 0) {
+      const totalConstraints = state.presetConstraintGroups.reduce((sum, g) => sum + g.presets.length, 0);
+
+      const presetFolder = document.createElement("li");
+      presetFolder.className = "preset-folder";
+      const toggle = document.createElement("span");
+      toggle.className = "folder-toggle";
+      toggle.textContent = state.presetsExpanded.constraints ? "\u25BC" : "\u25B6";
+      const label = document.createElement("span");
+      label.className = "folder-label";
+      label.textContent = `Presets (${totalConstraints})`;
+      presetFolder.appendChild(toggle);
+      presetFolder.appendChild(label);
+      presetFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        togglePresetFolder("constraints");
+      });
+      constraintsList.appendChild(presetFolder);
+
+      // Add nested objective function groups (collapsible)
+      if (state.presetsExpanded.constraints) {
+        const groupsContainer = document.createElement("ul");
+        groupsContainer.className = "preset-list constraint-groups";
+
+        for (const group of state.presetConstraintGroups) {
+          const groupItem = document.createElement("li");
+          groupItem.className = "constraint-group";
+
+          // Group header
+          const groupHeader = document.createElement("div");
+          groupHeader.className = "constraint-group-header";
+          const groupToggle = document.createElement("span");
+          groupToggle.className = "folder-toggle";
+          groupToggle.textContent = state.constraintGroupsExpanded[group.objectiveFunction] ? "\u25BC" : "\u25B6";
+          const groupLabel = document.createElement("span");
+          groupLabel.className = "group-label";
+          groupLabel.textContent = `${group.displayName} (${group.presets.length})`;
+          groupHeader.appendChild(groupToggle);
+          groupHeader.appendChild(groupLabel);
+          groupHeader.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleConstraintGroup(group.objectiveFunction);
+          });
+          groupItem.appendChild(groupHeader);
+
+          // Group presets (if expanded)
+          if (state.constraintGroupsExpanded[group.objectiveFunction]) {
+            const presetList = document.createElement("ul");
+            presetList.className = "preset-list group-presets";
+            for (const preset of group.presets) {
+              const li = document.createElement("li");
+              li.textContent = preset.name;
+              li.className = "preset-item";
+              li.addEventListener("click", (e) => {
+                e.stopPropagation();
+                loadPreset("constraints", preset.path);
+              });
+              presetList.appendChild(li);
+            }
+            groupItem.appendChild(presetList);
+          }
+
+          groupsContainer.appendChild(groupItem);
+        }
+
+        constraintsList.appendChild(groupsContainer);
+      }
+    }
+
     // Add "Load Default" option
     const loadDefaultLi = document.createElement("li");
     loadDefaultLi.textContent = "+ Load Default Constraints";
@@ -1384,6 +2019,14 @@ function updateSidebar() {
       importConstraintsFile();
     });
     constraintsList.appendChild(openFileLi);
+
+    // Separator if we have loaded constraints
+    if (state.constraints.size > 0) {
+      const separator = document.createElement("li");
+      separator.className = "separator";
+      separator.textContent = "\u2500 Loaded \u2500";
+      constraintsList.appendChild(separator);
+    }
 
     // List loaded constraints
     state.constraints.forEach((constraints, id) => {
@@ -2323,7 +2966,13 @@ function init() {
     isResizing = false;
   });
 
+  // Initialize keyboard shortcuts
+  initKeyboardShortcuts();
+
   log("WWIDesigner Web ready", "success");
+
+  // Load presets on startup
+  loadAllPresets();
 }
 
 // Start
