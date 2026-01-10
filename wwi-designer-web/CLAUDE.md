@@ -104,6 +104,16 @@ src/
 └── web/
     ├── server.ts                 # Bun.serve API endpoints
     └── frontend.ts               # Web UI (instrument editor, visualization)
+
+presets/
+└── NAF/                          # Native American Flute presets (67 files)
+    ├── instruments/              # 25 starter instruments (various bore sizes)
+    ├── tunings/                  # 10 tuning files (chromatic tunings by key)
+    ├── constraints/              # 19 constraint files (organized by objective function)
+    ├── scales/                   # 7 chromatic scale definitions
+    ├── temperaments/             # 2 temperament files (ET, Just Intonation)
+    ├── fingerings/               # 1 standard 6-hole fingering chart
+    └── symbols/                  # 3 note symbol systems (Helmholtz, MIDI, Scientific)
 ```
 
 ### Core Acoustic Engine

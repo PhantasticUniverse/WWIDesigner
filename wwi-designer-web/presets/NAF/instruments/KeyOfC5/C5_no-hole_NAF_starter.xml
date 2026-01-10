@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:instrument xmlns:ns2="http://www.wwidesigner.com/Instrument">
+    <name>5/8" bore, 6-hole NAF start</name>
+    <description>Black NAF file for creating a flute in the key of C5, with an ~18:1 bore length to diameter ratio.</description>
+    <lengthType>mm</lengthType>
+    <mouthpiece>
+        <position>4.8</position>
+        <fipple>
+            <windowLength>4.8</windowLength>
+            <windowWidth>7.95</windowWidth>
+            <fippleFactor>0.89632</fippleFactor>
+            <windwayHeight>0.9600000000000001</windwayHeight>
+        </fipple>
+    </mouthpiece>
+    <borePoint>
+        <borePosition>0.0</borePosition>
+        <boreDiameter>15.9</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>287.0</borePosition>
+        <boreDiameter>15.9</boreDiameter>
+    </borePoint>
+    <termination>
+        <flangeDiameter>25.500000000000004</flangeDiameter>
+    </termination>
+</ns2:instrument>

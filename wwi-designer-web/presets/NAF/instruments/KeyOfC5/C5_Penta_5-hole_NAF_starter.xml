@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:instrument xmlns:ns2="http://www.wwidesigner.com/Instrument">
+    <name>5/8" bore, 6-hole NAF start</name>
+    <description>Base NAF file for creating a flute in the key of C5 or thereabouts, with an 18:1 bore length to diameter ratio.
+
+24C - 60% Humidity</description>
+    <lengthType>mm</lengthType>
+    <mouthpiece>
+        <position>4.8</position>
+        <fipple>
+            <windowLength>4.8</windowLength>
+            <windowWidth>7.95</windowWidth>
+            <fippleFactor>0.89072</fippleFactor>
+            <windwayHeight>0.9600000000000002</windwayHeight>
+        </fipple>
+    </mouthpiece>
+    <borePoint>
+        <borePosition>0.0</borePosition>
+        <boreDiameter>15.9</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>283.0455695898664</borePosition>
+        <boreDiameter>15.899999999996101</boreDiameter>
+    </borePoint>
+    <hole>
+        <name>Hole 6</name>
+        <borePosition>77.76214812990415</borePosition>
+        <diameter>4.917476317069757</diameter>
+        <height>4.8</height>
+    </hole>
+    <hole>
+        <name>Hole 5</name>
+        <borePosition>98.08632203015873</borePosition>
+        <diameter>5.574068751591963</diameter>
+        <height>4.8</height>
+    </hole>
+    <hole>
+        <name>Hole 4</name>
+        <borePosition>118.4104959304133</borePosition>
+        <diameter>8.0</diameter>
+        <height>4.8</height>
+    </hole>
+    <hole>
+        <name>Hole 3</name>
+        <borePosition>148.37425278183184</borePosition>
+        <diameter>6.099365918960328</diameter>
+        <height>4.8</height>
+    </hole>
+    <hole>
+        <name>Hole 2</name>
+        <borePosition>178.37425278183184</borePosition>
+        <diameter>6.862120535761847</diameter>
+        <height>4.8</height>
+    </hole>
+    <hole>
+        <name>Hole 1</name>
+        <borePosition>208.37425278183184</borePosition>
+        <diameter>8.0</diameter>
+        <height>4.8</height>
+    </hole>
+    <termination>
+        <flangeDiameter>25.500000000000004</flangeDiameter>
+    </termination>
+</ns2:instrument>

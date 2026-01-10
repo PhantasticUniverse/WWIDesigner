@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:tuning xmlns:ns2="http://www.wwidesigner.com/Tuning">
+    <name>C5 - No hole tuning</name>
+    <comment>For calculating fipple factor</comment>
+    <numberOfHoles>0</numberOfHoles>
+    <fingering>
+        <note>
+            <name>Note</name>
+            <frequency>523.251</frequency>
+        </note>
+        <optimizationWeight>1</optimizationWeight>
+    </fingering>
+</ns2:tuning>

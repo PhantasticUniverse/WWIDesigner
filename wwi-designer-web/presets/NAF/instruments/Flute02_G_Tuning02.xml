@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:instrument xmlns:ns2="http://www.wwidesigner.com/Instrument">
+    <name>19.2mm bore, 6-hole NAF start</name>
+    <description>Base NAF file for creating a flute in the key of G4 or thereabouts, with an 18:1 bore length to diameter ratio.</description>
+    <lengthType>mm</lengthType>
+    <mouthpiece>
+        <position>5.6</position>
+        <fipple>
+            <windowLength>5.6</windowLength>
+            <windowWidth>9.6</windowWidth>
+            <fippleFactor>0.9785682028508731</fippleFactor>
+            <windwayHeight>1.12</windwayHeight>
+        </fipple>
+    </mouthpiece>
+    <borePoint>
+        <borePosition>0.0</borePosition>
+        <boreDiameter>19.2</boreDiameter>
+    </borePoint>
+    <borePoint>
+        <borePosition>387.9999</borePosition>
+        <boreDiameter>19.199999999999186</boreDiameter>
+    </borePoint>
+    <hole>
+        <name>Hole 6</name>
+        <borePosition>101.199975</borePosition>
+        <diameter>6.947631976319505</diameter>
+        <height>4.0</height>
+    </hole>
+    <hole>
+        <name>Hole 5</name>
+        <borePosition>121.519975</borePosition>
+        <diameter>5.5406002753553025</diameter>
+        <height>4.0</height>
+    </hole>
+    <hole>
+        <name>Hole 4</name>
+        <borePosition>141.839975</borePosition>
+        <diameter>4.35586342381732</diameter>
+        <height>4.0</height>
+    </hole>
+    <hole>
+        <name>Hole 3</name>
+        <borePosition>193.5645959040958</borePosition>
+        <diameter>5.319929251570851</diameter>
+        <height>4.0</height>
+    </hole>
+    <hole>
+        <name>Hole 2</name>
+        <borePosition>220.53094882950734</borePosition>
+        <diameter>4.773087455491476</diameter>
+        <height>4.0</height>
+    </hole>
+    <hole>
+        <name>Hole 1</name>
+        <borePosition>247.49730175491885</borePosition>
+        <diameter>4.906170612260172</diameter>
+        <height>4.0</height>
+    </hole>
+    <termination>
+        <flangeDiameter>27.2</flangeDiameter>
+    </termination>
+</ns2:instrument>

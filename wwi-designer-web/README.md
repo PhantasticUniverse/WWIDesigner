@@ -154,6 +154,16 @@ src/
 ├── models/                    # Instrument and tuning data models
 ├── utils/                     # XML converter for legacy files
 └── web/                       # Bun.serve web interface
+
+presets/
+└── NAF/                       # Native American Flute presets (67 XML files)
+    ├── instruments/           # Starter instruments (various bore sizes)
+    ├── tunings/               # Chromatic tunings by key
+    ├── constraints/           # Optimization constraints by objective function
+    ├── scales/                # Chromatic scale definitions
+    ├── temperaments/          # ET and Just Intonation temperaments
+    ├── fingerings/            # Standard 6-hole fingering chart
+    └── symbols/               # Note symbol systems
 ```
 
 ## Testing
