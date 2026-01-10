@@ -39,6 +39,11 @@
 | Issue | Impact | Status |
 |-------|--------|--------|
 | **CMA-ES missing eigendecomposition** | Loses covariance adaptation | Open |
+| **File → Open Instrument not working in Chrome** | File dialog doesn't open in Chrome (works in Firefox/Zen, Playwright) | Open |
+
+**File input issue in Chrome:**
+
+The File → Open Instrument menu item calls `input.click()` on a programmatically created file input, but the file dialog doesn't appear in Chrome (including Incognito). Works correctly in Firefox-based browsers and Playwright's Chromium. Workaround: use a different browser, or load presets from the sidebar instead.
 
 **CMA-ES eigendecomposition (not yet implemented):**
 
