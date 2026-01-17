@@ -2,3 +2,13 @@ WWIDesigner/releases/2/WIDesigner-2.6/
 
 # Java compiled files
 *.class
+
+# OS files
+.DS_Store
+
+# Test artifacts
+wwi-designer-web/playwright-report/
+wwi-designer-web/test-results/
+
+# Playwright MCP
+.playwright-mcp/

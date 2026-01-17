@@ -27,7 +27,7 @@
 | Evaluators | **7/8** | Missing only WhistleEvaluator |
 | Tuners | **5/5** | Simple, LinearV, LinearX, BellNotes, base |
 | Spectrum Analyzers | **3/3** | Impedance, Reflectance, PlayingRange |
-| Tests | **810** | All passing |
+| Tests | **811** | All passing |
 
 ### Not Implemented (Low Priority)
 
@@ -36,27 +36,14 @@
 
 ### Known Issues
 
-| Issue | Impact | Status |
-|-------|--------|--------|
-| **CMA-ES missing eigendecomposition** | Loses covariance adaptation | Open |
-| **File → Open Instrument not working in Chrome** | File dialog doesn't open in Chrome (works in Firefox/Zen, Playwright) | Open |
-
-**File input issue in Chrome:**
-
-The File → Open Instrument menu item calls `input.click()` on a programmatically created file input, but the file dialog doesn't appear in Chrome (including Incognito). Works correctly in Firefox-based browsers and Playwright's Chromium. Workaround: use a different browser, or load presets from the sidebar instead.
-
-**CMA-ES eigendecomposition (not yet implemented):**
-
-The CMA-ES optimizer (`src/core/optimization/cmaes-optimizer.ts` lines 279-283) uses a simplified approach:
-- B matrix stays identity (never updated)
-- Eigenvalues extracted from diagonal only
-
-This breaks covariance adaptation, the main advantage of CMA-ES over simpler methods. Java uses Apache Commons Math which handles eigendecomposition internally. Fix requires implementing Jacobi algorithm for symmetric matrices.
+No known issues at this time.
 
 ### Resolved Issues
 
 | Issue | Resolution |
 |-------|------------|
+| **CMA-ES missing eigendecomposition** | ✅ Implemented Jacobi algorithm for proper covariance adaptation |
+| **File → Open Instrument not working in Chrome** | ✅ Fixed by appending input element to DOM before click |
 | **Complex class object allocation** | ✅ In-place operations added (`multiplyInPlace`, `addInPlace`, etc.) |
 | **TransferMatrix memory pressure** | ✅ Scratch objects with in-place operations implemented |
 | **TypeScript strict mode errors** | ✅ All 782 errors fixed, zero errors remaining |
