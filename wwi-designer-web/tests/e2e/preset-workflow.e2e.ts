@@ -1,114 +1,120 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+/**
+ * Wait for the app to be fully loaded and interactive.
+ */
+async function waitForAppReady(page: Page) {
+  // Wait for the main heading to be visible (indicates app loaded)
+  await expect(page.locator("h1")).toContainText("WWIDesigner", { timeout: 15000 });
+
+  // Wait for sidebar categories to be visible (indicates presets loaded)
+  await expect(page.locator('[data-category="instruments"]')).toBeVisible({ timeout: 10000 });
+}
 
 test.describe("Preset Browser", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    // Wait for app to initialize
-    await expect(page.locator("h1")).toContainText("WWIDesigner");
+    await page.goto("/", { waitUntil: "load" });
+    await waitForAppReady(page);
   });
 
   test("loads preset lists on startup", async ({ page }) => {
-    // Wait for presets to load
-    await page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/presets/instruments") && resp.status() === 200
-    );
-
+    // Presets already loaded by waitForAppReady in beforeEach
     // Check that console shows success message
-    await expect(page.locator("#console-content")).toContainText(
-      "Loaded"
-    );
+    await expect(page.locator("#console-content")).toContainText("Loaded");
     await expect(page.locator("#console-content")).toContainText("presets");
   });
 
   test("shows preset folders in sidebar", async ({ page }) => {
-    // Wait for presets to load
-    await page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/presets/instruments") && resp.status() === 200
-    );
-
-    // Expand instruments section
-    await page.click('[data-category="instruments"]');
+    // Expand instruments section - wait for button to be visible first
+    const instrumentsBtn = page.locator('[data-category="instruments"]');
+    await instrumentsBtn.waitFor({ state: "visible" });
+    await instrumentsBtn.click();
 
     // Check preset folder exists
     await expect(page.locator(".preset-folder").first()).toBeVisible();
-    await expect(page.locator(".preset-folder .folder-label").first()).toContainText("Presets");
+    await expect(
+      page.locator(".preset-folder .folder-label").first()
+    ).toContainText("Presets");
   });
 
   test("can expand and browse instrument presets", async ({ page }) => {
-    // Wait for presets to load
-    await page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/presets/instruments") && resp.status() === 200
-    );
-
     // Expand instruments section
-    await page.click('[data-category="instruments"]');
+    const instrumentsBtn = page.locator('[data-category="instruments"]');
+    await instrumentsBtn.waitFor({ state: "visible" });
+    await instrumentsBtn.click();
 
     // Click to expand presets folder
-    await page.click("#instruments-list .preset-folder");
+    const presetFolder = page.locator("#instruments-list .preset-folder");
+    await presetFolder.waitFor({ state: "visible" });
+    await presetFolder.click();
 
     // Verify preset list is visible
     await expect(page.locator("#instruments-list .preset-list")).toBeVisible();
-    await expect(page.locator("#instruments-list .preset-item").first()).toBeVisible();
+    await expect(
+      page.locator("#instruments-list .preset-item").first()
+    ).toBeVisible();
   });
 
   test("loads instrument preset into editor", async ({ page }) => {
-    // Wait for presets to load
-    await page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/presets/instruments") && resp.status() === 200
-    );
-
     // Expand instruments section and preset folder
-    await page.click('[data-category="instruments"]');
-    await page.click("#instruments-list .preset-folder");
+    const instrumentsBtn = page.locator('[data-category="instruments"]');
+    await instrumentsBtn.waitFor({ state: "visible" });
+    await instrumentsBtn.click();
+
+    const presetFolder = page.locator("#instruments-list .preset-folder");
+    await presetFolder.waitFor({ state: "visible" });
+    await presetFolder.click();
 
     // Click first preset
     const presetItem = page.locator("#instruments-list .preset-item").first();
-    await presetItem.click();
+    await presetItem.waitFor({ state: "visible" });
 
-    // Wait for preset to load
-    await page.waitForResponse(
+    // Start waiting for response before clicking
+    const responsePromise = page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/presets/instruments/") && resp.status() === 200
     );
+    await presetItem.click();
+    await responsePromise;
 
     // Verify console shows success message
     await expect(page.locator("#console-content")).toContainText(
       "Loaded instrument preset"
     );
 
-    // Verify editor tab opened (look for a tab)
-    await expect(page.locator(".tab")).toBeVisible();
+    // Verify editor tab opened (should have 2 tabs now: Welcome + preset)
+    await expect(page.locator(".tab")).toHaveCount(2);
   });
 });
 
 test.describe("Tuning Presets", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/presets/tunings") && resp.status() === 200
-    );
+    await page.goto("/", { waitUntil: "load" });
+    await waitForAppReady(page);
   });
 
   test("can load tuning preset", async ({ page }) => {
     // Expand tunings section
-    await page.click('[data-category="tunings"]');
+    const tuningsBtn = page.locator('[data-category="tunings"]');
+    await tuningsBtn.waitFor({ state: "visible" });
+    await tuningsBtn.click();
 
     // Expand presets folder
-    await page.click("#tunings-list .preset-folder");
+    const presetFolder = page.locator("#tunings-list .preset-folder");
+    await presetFolder.waitFor({ state: "visible" });
+    await presetFolder.click();
 
     // Click first preset
-    await page.locator("#tunings-list .preset-item").first().click();
+    const presetItem = page.locator("#tunings-list .preset-item").first();
+    await presetItem.waitFor({ state: "visible" });
 
-    // Wait for load
-    await page.waitForResponse(
+    // Start waiting for response before clicking
+    const responsePromise = page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/presets/tunings/") && resp.status() === 200
     );
+    await presetItem.click();
+    await responsePromise;
 
     // Verify success
     await expect(page.locator("#console-content")).toContainText(
@@ -119,47 +125,60 @@ test.describe("Tuning Presets", () => {
 
 test.describe("Full Workflow", () => {
   test("load preset, calculate tuning, verify results", async ({ page }) => {
-    await page.goto("/");
-
-    // Wait for presets
-    await page.waitForResponse(
-      (resp) =>
-        resp.url().includes("/api/presets/instruments") && resp.status() === 200
-    );
+    await page.goto("/", { waitUntil: "load" });
+    await waitForAppReady(page);
 
     // Load instrument preset
-    await page.click('[data-category="instruments"]');
-    await page.click("#instruments-list .preset-folder");
-    await page.locator("#instruments-list .preset-item").first().click();
+    const instrumentsBtn = page.locator('[data-category="instruments"]');
+    await instrumentsBtn.waitFor({ state: "visible" });
+    await instrumentsBtn.click();
 
-    await page.waitForResponse(
+    const instFolder = page.locator("#instruments-list .preset-folder");
+    await instFolder.waitFor({ state: "visible" });
+    await instFolder.click();
+
+    const instItem = page.locator("#instruments-list .preset-item").first();
+    await instItem.waitFor({ state: "visible" });
+
+    const instResponse = page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/presets/instruments/") && resp.status() === 200
     );
+    await instItem.click();
+    await instResponse;
 
     // Load tuning preset
-    await page.click('[data-category="tunings"]');
-    await page.click("#tunings-list .preset-folder");
-    await page.locator("#tunings-list .preset-item").first().click();
+    const tuningsBtn = page.locator('[data-category="tunings"]');
+    await tuningsBtn.waitFor({ state: "visible" });
+    await tuningsBtn.click();
 
-    await page.waitForResponse(
+    const tuningFolder = page.locator("#tunings-list .preset-folder");
+    await tuningFolder.waitFor({ state: "visible" });
+    await tuningFolder.click();
+
+    const tuningItem = page.locator("#tunings-list .preset-item").first();
+    await tuningItem.waitFor({ state: "visible" });
+
+    const tuningResponse = page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/presets/tunings/") && resp.status() === 200
     );
+    await tuningItem.click();
+    await tuningResponse;
 
-    // Click Calculate Tuning button
-    await page.click('[data-action="calculate-tuning"]');
+    // Click Calculate Tuning button (use the primary action button, not menu items)
+    const calcBtn = page.locator('button.action-btn[data-action="calculate-tuning"]');
+    await calcBtn.waitFor({ state: "visible" });
 
-    // Wait for calculation API call
-    const response = await page.waitForResponse(
+    const calcResponse = page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/calculate-tuning") && resp.status() === 200
     );
+    await calcBtn.click();
+    await calcResponse;
 
     // Verify calculation completed
-    await expect(page.locator("#console-content")).toContainText(
-      "calculated"
-    );
+    await expect(page.locator("#console-content")).toContainText("calculated");
   });
 });
 
@@ -190,8 +209,9 @@ test.describe("API Health Checks", () => {
 
     const data = await response.json();
     expect(data.category).toBe("constraints");
-    expect(Array.isArray(data.presets)).toBe(true);
-    expect(data.presets.length).toBeGreaterThan(0);
+    // Constraints API returns groups (organized by objective function) instead of flat presets
+    expect(Array.isArray(data.groups)).toBe(true);
+    expect(data.groups.length).toBeGreaterThan(0);
   });
 
   test("individual preset loads correctly", async ({ request }) => {
@@ -222,10 +242,20 @@ test.describe("API Health Checks", () => {
 
 test.describe("Keyboard Shortcuts", () => {
   test("Escape closes modal", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "load" });
+    await waitForAppReady(page);
 
-    // Open about modal
-    await page.click('[data-action="about"]');
+    // Open Help menu first (About is inside dropdown)
+    const helpMenuBtn = page.locator('[data-menu="help"]');
+    await helpMenuBtn.waitFor({ state: "visible" });
+    await helpMenuBtn.click();
+
+    // Now click About button in the dropdown
+    const aboutBtn = page.locator('[data-action="about"]');
+    await aboutBtn.waitFor({ state: "visible" });
+    await aboutBtn.click();
+
+    // Wait for modal to open
     await expect(page.locator("#about-modal")).toHaveClass(/open/);
 
     // Press Escape
