@@ -247,15 +247,19 @@ function initKeyboardShortcuts() {
     if ((e.ctrlKey || e.metaKey) && e.key === "o") {
       e.preventDefault();
       // Trigger file import
+      // Note: Input must be added to DOM for Chrome compatibility
       const fileInput = document.createElement("input");
       fileInput.type = "file";
       fileInput.accept = ".xml";
+      fileInput.style.display = "none";
+      document.body.appendChild(fileInput);
       fileInput.addEventListener("change", (ev) => {
         const target = ev.target as HTMLInputElement;
         if (target.files && target.files.length > 0) {
           const file = target.files[0]!;
           handleFileImport(file);
         }
+        document.body.removeChild(fileInput);
       });
       fileInput.click();
     }
@@ -2281,12 +2285,18 @@ function downloadFile(filename: string, content: string, mimeType: string) {
 }
 
 function importInstrumentFile() {
+  // Note: Input must be added to DOM for Chrome compatibility
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".xml,.json";
+  input.style.display = "none";
+  document.body.appendChild(input);
   input.onchange = async () => {
     const file = input.files?.[0];
-    if (!file) return;
+    if (!file) {
+      document.body.removeChild(input);
+      return;
+    }
 
     try {
       const text = await file.text();
@@ -2300,17 +2310,24 @@ function importInstrumentFile() {
     } catch (error) {
       log(`Failed to import instrument: ${error}`, "error");
     }
+    document.body.removeChild(input);
   };
   input.click();
 }
 
 function importTuningFile() {
+  // Note: Input must be added to DOM for Chrome compatibility
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".xml,.json";
+  input.style.display = "none";
+  document.body.appendChild(input);
   input.onchange = async () => {
     const file = input.files?.[0];
-    if (!file) return;
+    if (!file) {
+      document.body.removeChild(input);
+      return;
+    }
 
     try {
       const text = await file.text();
@@ -2324,6 +2341,7 @@ function importTuningFile() {
     } catch (error) {
       log(`Failed to import tuning: ${error}`, "error");
     }
+    document.body.removeChild(input);
   };
   input.click();
 }
@@ -2387,12 +2405,18 @@ async function loadDefaultConstraints() {
  * Import constraints from a file.
  */
 function importConstraintsFile() {
+  // Note: Input must be added to DOM for Chrome compatibility
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".xml,.json";
+  input.style.display = "none";
+  document.body.appendChild(input);
   input.onchange = async () => {
     const file = input.files?.[0];
-    if (!file) return;
+    if (!file) {
+      document.body.removeChild(input);
+      return;
+    }
 
     try {
       const text = await file.text();
@@ -2409,6 +2433,7 @@ function importConstraintsFile() {
 
       if (data.error) {
         log(`Error: ${data.error}`, "error");
+        document.body.removeChild(input);
         return;
       }
 
@@ -2421,6 +2446,7 @@ function importConstraintsFile() {
     } catch (error) {
       log(`Failed to import constraints: ${error}`, "error");
     }
+    document.body.removeChild(input);
   };
   input.click();
 }

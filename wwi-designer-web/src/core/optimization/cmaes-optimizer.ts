@@ -276,11 +276,16 @@ export class CMAESOptimizer {
         }
       }
 
-      // 7. Update eigendecomposition (simplified: update diagonal approximation)
-      // Full eigendecomposition is expensive; use simplified update for now
+      // 7. Update eigendecomposition using Jacobi algorithm
+      // This enables proper covariance adaptation on correlated problems
+      const { eigenvalues, eigenvectors } = jacobiEigendecomposition(C);
       for (let i = 0; i < n; i++) {
-        diagD[i] = Math.sqrt(Math.max(1e-20, C[i]![i]!));
-        // Keep B as identity for simplified version
+        // Store sqrt of eigenvalues (standard deviations along principal axes)
+        diagD[i] = Math.sqrt(Math.max(1e-20, eigenvalues[i]!));
+        // Update eigenvector matrix
+        for (let j = 0; j < n; j++) {
+          B[i]![j] = eigenvectors[i]![j]!;
+        }
       }
 
       // 8. Update step-size sigma using cumulative step-size adaptation
@@ -345,6 +350,120 @@ function identity(n: number): number[][] {
     I[i][i] = 1;
   }
   return I;
+}
+
+/**
+ * Jacobi eigendecomposition for symmetric matrices.
+ *
+ * Computes eigenvalues and eigenvectors of a symmetric matrix using
+ * the iterative Jacobi method with Givens rotations.
+ *
+ * @param A Symmetric matrix (modified in place to diagonal form)
+ * @param tolerance Convergence tolerance for off-diagonal elements
+ * @param maxIterations Maximum number of sweeps
+ * @returns Object with eigenvalues array and eigenvectors matrix (columns are eigenvectors)
+ */
+function jacobiEigendecomposition(
+  A: number[][],
+  tolerance = 1e-10,
+  maxIterations = 50
+): { eigenvalues: number[]; eigenvectors: number[][] } {
+  const n = A.length;
+
+  // Copy A to preserve original
+  const D: number[][] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    D[i] = [...A[i]!];
+  }
+
+  // Initialize eigenvector matrix as identity
+  const V = identity(n);
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    // Find the largest off-diagonal element
+    let maxOffDiag = 0;
+    let p = 0;
+    let q = 1;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const absVal = Math.abs(D[i]![j]!);
+        if (absVal > maxOffDiag) {
+          maxOffDiag = absVal;
+          p = i;
+          q = j;
+        }
+      }
+    }
+
+    // Check convergence
+    if (maxOffDiag < tolerance) {
+      break;
+    }
+
+    // Compute rotation angle using Jacobi formula
+    const app = D[p]![p]!;
+    const aqq = D[q]![q]!;
+    const apq = D[p]![q]!;
+
+    let theta: number;
+    if (Math.abs(aqq - app) < 1e-20) {
+      // Avoid division by zero
+      theta = Math.PI / 4;
+    } else {
+      theta = 0.5 * Math.atan2(2 * apq, aqq - app);
+    }
+
+    const cosT = Math.cos(theta);
+    const sinT = Math.sin(theta);
+
+    // Apply Givens rotation to D: D' = G^T * D * G
+    // Update rows/columns p and q only
+
+    // Save values before rotation
+    const Dp = new Array(n);
+    const Dq = new Array(n);
+    for (let i = 0; i < n; i++) {
+      Dp[i] = D[p]![i]!;
+      Dq[i] = D[q]![i]!;
+    }
+
+    // Update row/col p and q
+    for (let i = 0; i < n; i++) {
+      if (i !== p && i !== q) {
+        const dip = Dp[i]!;
+        const diq = Dq[i]!;
+        D[p]![i] = cosT * dip - sinT * diq;
+        D[i]![p] = D[p]![i]!;
+        D[q]![i] = sinT * dip + cosT * diq;
+        D[i]![q] = D[q]![i]!;
+      }
+    }
+
+    // Update diagonal elements
+    D[p]![p] = cosT * cosT * app - 2 * sinT * cosT * apq + sinT * sinT * aqq;
+    D[q]![q] = sinT * sinT * app + 2 * sinT * cosT * apq + cosT * cosT * aqq;
+
+    // Zero out the off-diagonal element
+    D[p]![q] = 0;
+    D[q]![p] = 0;
+
+    // Update eigenvector matrix: V' = V * G
+    for (let i = 0; i < n; i++) {
+      const vip = V[i]![p]!;
+      const viq = V[i]![q]!;
+      V[i]![p] = cosT * vip - sinT * viq;
+      V[i]![q] = sinT * vip + cosT * viq;
+    }
+  }
+
+  // Extract eigenvalues from diagonal
+  const eigenvalues = new Array(n);
+  for (let i = 0; i < n; i++) {
+    eigenvalues[i] = D[i]![i]!;
+  }
+
+  return { eigenvalues, eigenvectors: V };
 }
 
 /**

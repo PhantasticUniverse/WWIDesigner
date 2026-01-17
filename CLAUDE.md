@@ -16,7 +16,7 @@ bun run dev              # Development server (hot reload)
 bun run start            # Production server
 
 # Testing
-bun test                 # Run all 810 unit tests
+bun test                 # Run all 811 unit tests
 bun test --watch         # Watch mode
 bun run test:e2e         # Playwright E2E tests
 
@@ -58,7 +58,7 @@ WWIDesigner/
 - **Acoustic Engine:** Exact parity with Java WWIDesigner (15+ significant digits)
 - **Optimization:** DIRECT, BOBYQA, Brent, CMA-ES, Simplex, Powell
 - **TypeScript:** strict mode + noUncheckedIndexedAccess + noImplicitOverride
-- **Tests:** 810 unit tests + 12 E2E tests
+- **Tests:** 811 unit tests + 12 E2E tests
 
 ## Important Notes
 
@@ -69,10 +69,9 @@ WWIDesigner/
 
 ## Known Issues
 
-| Issue | Status |
-|-------|--------|
-| CMA-ES missing eigendecomposition | Open - loses covariance adaptation |
-| File input in Chrome | Open - use Firefox or presets instead |
+No known issues at this time. Previously resolved:
+- ✅ CMA-ES eigendecomposition - Implemented Jacobi algorithm
+- ✅ Chrome file input - Fixed by appending input to DOM
 
 ## Claude Code Configuration
 

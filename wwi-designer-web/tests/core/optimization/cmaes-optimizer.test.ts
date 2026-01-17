@@ -173,9 +173,10 @@ describe("CMA-ES Optimizer - Bounds Handling", () => {
 });
 
 describe("CMA-ES Optimizer - Challenging Functions", () => {
-  test("handles Rosenbrock function (valley)", () => {
+  test("handles Rosenbrock function (valley) - converges to optimum", () => {
     // f(x) = 100(x2 - x1^2)^2 + (1 - x1)^2, minimum at (1, 1)
-    // This is a challenging function with a narrow valley
+    // This is a challenging function with a narrow valley that requires
+    // proper covariance adaptation (eigendecomposition) to solve efficiently
     const result = cmaesMinimize(
       (x) => {
         const x1 = x[0]!;
@@ -185,11 +186,33 @@ describe("CMA-ES Optimizer - Challenging Functions", () => {
       [-5, -5],
       [5, 5],
       [0, 0],
-      { maxEvaluations: 10000 }
+      { maxEvaluations: 15000 }
     );
 
-    // CMA-ES should get reasonably close to the optimum
-    expect(result.value).toBeLessThan(10);
+    // With proper eigendecomposition, CMA-ES should converge well
+    expect(result.value).toBeLessThan(1);
+    expect(result.point[0]!).toBeCloseTo(1, 0); // Within 1 unit of true minimum
+    expect(result.point[1]!).toBeCloseTo(1, 0);
+  });
+
+  test("handles correlated ellipsoid function", () => {
+    // f(x) = (x1 + x2)^2 + 0.01*(x1 - x2)^2
+    // This function has a highly elongated valley along x1 = -x2
+    // Requires proper covariance adaptation to solve efficiently
+    const result = cmaesMinimize(
+      (x) => {
+        const x1 = x[0]!;
+        const x2 = x[1]!;
+        return Math.pow(x1 + x2, 2) + 0.01 * Math.pow(x1 - x2, 2);
+      },
+      [-5, -5],
+      [5, 5],
+      [2, -2],
+      { maxEvaluations: 5000 }
+    );
+
+    // Should converge well with proper covariance adaptation
+    expect(result.value).toBeLessThan(0.1);
   });
 
   test("handles multimodal function with local minima", () => {
